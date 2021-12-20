@@ -3,7 +3,7 @@ layout: post
 title: 인천 중구청 공공 와이파이 입지선정
 date: 2020-10-30 13:32:20 +0300
 description: 공공 빅데이터 청년인턴으로 수행한 첫 번째 프로젝트 # Add post description (optional)
-img: incheon_wifi.png # Add image post (optional)
+img: incheon_wifi.jpg  # Add image post (optional)
 fig-caption: # Add figcaption (optional)
 tags: [공공 빅데이터 청년인턴, 인천 중구]
 ---
@@ -155,7 +155,7 @@ EDA와 위에서 와이파이 개수를 시각화한 결과를 바탕으로, 영
 
 분석 결과를 토대로 와이파이 설치 지수가 높은 상위 10개 지역을 추려내어, 그 격자 내에서 가장 와이파이를 설치하기 적합한 장소를 선정해 리스트로 뽑아내었다.
 
-![wifi list top 10]({{site.baseurl}}/assets/img/wifi_list_top10.png)
+![wifi list top 10]({{site.baseurl}}/assets/img/wifi_list_top10.jpg)
 
 영종도에서 5개, 내륙의 5개 지역이 우선 설치지역 후보지로 도출되었다. 
 
