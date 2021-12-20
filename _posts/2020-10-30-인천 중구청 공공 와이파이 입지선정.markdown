@@ -1,0 +1,162 @@
+---
+layout: post
+title: 인천 중구청 공공 와이파이 입지선정
+date: 2020-10-30 13:32:20 +0300
+description: 공공 빅데이터 청년인턴으로 수행한 첫 번째 프로젝트 # Add post description (optional)
+img: incheon_wifi.png # Add image post (optional)
+fig-caption: # Add figcaption (optional)
+tags: [공공 빅데이터 청년인턴, 인천 중구]
+---
+## 개요
+
+인천 중구는 내륙지방에 196개, 영종도에 34개의 공공 와이파이가 설치되어 있다. 각 행정동의 와이파이 개수를 나타낸 결과, 영종 1동과 송월동, 율목동이 각각 설치가 저조함을 보였다. 따라서, 와이파이를 추가로 설치하기 위해 데이터 분석으로 격자당 와이파이 설치 지수를 계산하여, 최적 입지 장소 선정을 실시하였다. 본 프로젝트는 정부부처에서 실행한 프로젝트라 보안 규정에 따라 전체 코드를 공개할 수 없음을 알린다.(Github에도 코드를 업로드하지 못했다.)
+
+|![jungu_wifi_map]({{site.baseurl}}/assets/img/jungu_wifi_1.jpg)|![jungu_wifi_barplot]({{site.baseurl}}/assets/img/jungu_wifi_barplot.jpg)|
+
+
+
+
+
+## 사용 데이터/사용 기술
+
+사용 데이터 목록은 다음과 같다.
+
+![data_list]({{site.baseurl}}/assets/img/wifi_data_list.jpg)
+
+공공 데이터 포털과 국토정보플랫폼, 중구청 내 데이터를 사용하였다. 분석의 토대가 된 표준분석모델에서는 유동인구 데이터를 사용하였으나, 인천 중구의 특성을 반영하기 위해 약간 다른 데이터를 사용하기로 하였다. 중구 내륙에는 소상공인이, 영종도에는 거주인들이 많은 것을 고려하여 인구를 파악하기 위한 요소로 유동인구 대신 총생산인구를 사용하였다.
+
+사용된 기술은 다음과 같다.
+
+| ![QGIS]({{site.baseurl}}/assets/img/QGIS.jpg) | ![PostgreSQL]({{site.baseurl}}/assets/img/PostgreSQL.jpg) | ![Python]({{site.baseurl}}/assets/img/Python.png) |
+| --------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------- |
+| 데이터를 지도에 시각화                        | 격자 당 점수(와이파이 설치 지수) 계산                     | EDA 및 데이터 전처리                              |
+
+
+
+
+
+## 데이터 분석 과정
+데이터 분석은 표준분석 모델을 활용해 진행하였다.
+
+![data_analysis]({{site.baseurl}}/assets/img/wifi_data_analysis.jpg)
+
+
+
+### 데이터 전처리
+
+먼저 Python을 활용하여 데이터의 결측치를 확인하였다. 격자 기반의 데이터(shp)좌표계를 QGIS로 수정하여 정밀한 격자 가늠이 되도록 하였고(단위: 100m), 카카오 API를 활용해 좌표를 획득하였다.
+
+![좌표계 변경]({{site.baseurl}}/assets/img/change_coordinate.jpg)
+
+```python
+## 주소 -> 좌표로 변환하기
+import pandas as pd
+import numpy as np
+import json
+import requests
+
+## csv파일 열기 (encoding 옵션은 종류에 따라 수정)
+file = pd.read_csv('./중구건물상세주소.csv', encoding = 'CP949')
+
+url='https://dapi.kakao.com/v2/local/search/address.json?query=' + addr
+headers = {"Authorization": "KakaoAK 057873079626a592436710b8c7b612e8"}
+result = json.loads(str(requests.get(url, headers=headers).text))
+match_first = result['documents'][0]['address']
+
+# 만약 찾지 못할 경우, 이전 위경도로 저장되므로 중복처리 한번 진행
+for i in range(len(file)):
+    # ---이부분은 생략가능(얼마나 진행됬는지 확인)---
+    if (i%1000 == 0):
+        print(str(i)+" rows done")
+    # ------------------------------------------------
+    try:
+        match_first= {'x': 0, 'y': 0}
+        addr = file['소재지'][i]
+        url='https://dapi.kakao.com/v2/local/search/address.json?query=' + addr
+        headers = {"Authorization": "KakaoAK 057873079626a592436710b8c7b612e8"}
+        result = json.loads(str(requests.get(url, headers=headers).text))
+        match_first = result['documents'][0]['address']
+
+        ## 데이터 추가
+        file['위도'][i] = match_first['y']
+        file['경도'][i] = match_first['x']
+        
+    except IndexError:
+        pass
+```
+
+
+
+### EDA
+
+전처리가 완료된 데이터로 간단한 데이터 탐색을 진행하였다.
+
+| ![wifi_eda_1]({{site.baseurl}}/assets/img/wifi_eda.jpg) | ![wifi_eda_2]({{site.baseurl}}/assets/img/wifi_eda1.jpg) | ![wifi_eda_3]({{site.baseurl}}/assets/img/wifi_eda2.jpg) |
+| ------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------- |
+| 와이파이 설치수 top9                                    | 영종도                                                   | 내륙                                                     |
+
+현재(2020.10 기준) 가장 와이파이가 많이 설치된 지역은 북성동 1가였고, 그 뒤를 향동가, 사동, 운복동이 이었다. 이 지역들을 지도에 표시해보니 영종도와 내륙 지역에 다음과 같이 나타났다.
+
+EDA와 위에서 와이파이 개수를 시각화한 결과를 바탕으로, 영종 1동과 송월동, 율목동과 같이 기존에 와이파이 설치가 되어있지 않은 지역이 와이파이 설치 지수가 높을 것이라 예상하였다. 
+
+
+
+### 데이터 분석
+
+와이파이 설치 지수는 와이파이 지수, 인구 지수, 시설 지수를 고려하여 계산하였다.
+
+와이파이 지수를 분석한 과정은 다음과 같다.
+
+- PostgreSQL을 활용하여 각각의 격자 당 점수 계산
+- 기존에 와이파이가 존재하면 격자에 기본 점수 1점, 없다면 5점을 부여
+- 와이파이가 존재하는 격자 주위 150m에는 낮은 점수를 부여(중복 설치 방지)
+
+인구 지수를 분석한 과정은 다음과 같다.
+
+- Natural Break를 활용하여 격자별 인구 구간당 점수 부여(0~4단계 구분)
+- 총생산인구, 총인구, 초등학생 인구 사용
+
+시설 지수를 분석한 과정은 다음과 같다.
+
+- 시설 점수 가점을 부여, 거리 기준으로 계산
+- 집합건물, 버스정류장, 다중이용시설, 음식점, 문화재 등이 있는 격자는 거리에 따른 가점을 얻음
+- 학교 시설의 경우, 교육청에서 진행하는 와이파이 설치 계획에 의거하여 우선순위에서 배제, 감점을 얻음
+
+이를 종합하면 다음과 같다.
+
+![wifi_point]({{site.baseurl}}/assets/img/wifi_point.jpg)
+
+
+
+
+
+## 분석 결과
+
+먼저 전체 격자 점수를 비교한 결과를 시각화하였다.
+
+| ![wifi_total]({{site.baseurl}}/assets/img/all_rate.jpg) | ![jungu_wifi_map]({{site.baseurl}}/assets/img/jungu_wifi_1.jpg) |
+| ------------------------------------------------------- | ------------------------------------------------------------ |
+| 전체 격자 점수                                          | 와이파이 설치 현황(빨강: 부족, 파랑: 상대적으로 많음)        |
+
+우선 설치 지역으로 예상 되었던(빨간색) 지역에 상대적으로 우선 설치 지역이 다수 존재하였으나, 와이파이가 적지 않은 지역 또한 우선 설치 지역이 도출 되는 경향을 보였다.
+
+전체 격자 점수를 Natural break 하여 설치 지역 점수의 상위 지역들을 표시하게 하였다.
+
+![total top]({{site.baseurl}}/assets/img/total_top.jpg)
+
+그 결과, 설치 지역 점수 상위 1분위는 3%에 해당됨을 알 수 있었다. 또한 연안동과 월미도 일대를 제외한 행정동은, 와이파이가 적은 지역으로서 우선설치지역에 해당하였다.
+
+반면, 하위 1분위 구간의 격자를 시각화한 것은 다음과 같다.
+
+![total low]({{site.baseurl}}/assets/img/total_low.jpg)
+인천공항과 산(임야), 공장지역은 상대적으로 점수가 낮게 나왔으며, 유동인구가 모일 요소(관광시설 등)이 존재하지 않았다. 인천공항이 점수가 낮게 나온 이유는 이미 와이파이가 설치되어 있기 때문으로 보인다.
+
+### 상위 설치 지역 리스트
+
+분석 결과를 토대로 와이파이 설치 지수가 높은 상위 10개 지역을 추려내어, 그 격자 내에서 가장 와이파이를 설치하기 적합한 장소를 선정해 리스트로 뽑아내었다.
+
+![wifi list top 10]({{site.baseurl}}/assets/img/wifi_list_top10.png)
+
+영종도에서 5개, 내륙의 5개 지역이 우선 설치지역 후보지로 도출되었다. 
+
+공공 와이파이 특성상, 사유지가 아닌 격자 내 공공시설에 우선적으로 와이파이가 설치되도록 선정하였다.

@@ -1,0 +1,116 @@
+I"H,<h2 id="개요">개요</h2>
+
+<p>인천 중구는 내륙지방에 196개, 영종도에 34개의 공공 와이파이가 설치되어 있다. 각 행정동의 와이파이 개수를 나타낸 결과, 영종 1동과 송월동, 율목동이 각각 설치가 저조함을 보였다. 따라서, 와이파이를 추가로 설치하기 위해 데이터 분석으로 격자당 와이파이 설치 지수를 계산하여, 최적 입지 장소 선정을 실시하였다. 본 프로젝트는 정부부처에서 실행한 프로젝트라 보안 규정에 따라 전체 코드를 공개할 수 없음을 알린다.(Github에도 코드를 업로드하지 못했다.)</p>
+
+<table>
+  <tbody>
+    <tr>
+      <td><img src="/assets/img/jungu_wifi_1.jpg" alt="jungu_wifi_map" /></td>
+      <td><img src="/assets/img/jungu_wifi_barplot.jpg" alt="jungu_wifi_barplot" /></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="사용-데이터사용-기술">사용 데이터/사용 기술</h2>
+
+<p>사용 데이터 목록은 다음과 같다.</p>
+
+<p><img src="/assets/img/wifi_data_list.jpg" alt="data_list" /></p>
+
+<p>공공 데이터 포털과 국토정보플랫폼, 중구청 내 데이터를 사용하였다. 분석의 토대가 된 표준분석모델에서는 유동인구 데이터를 사용하였으나, 인천 중구의 특성을 반영하기 위해 약간 다른 데이터를 사용하기로 하였다. 중구 내륙에는 소상공인이, 영종도에는 거주인들이 많은 것을 고려하여 인구를 파악하기 위한 요소로 유동인구 대신 총생산인구를 사용하였다.</p>
+
+<p>사용된 기술은 다음과 같다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th><img src="/assets/img/QGIS.jpg" alt="QGIS" /></th>
+      <th><img src="/assets/img/PostgreSQL.jpg" alt="PostgreSQL" /></th>
+      <th><img src="/assets/img/Python.png" alt="Python" /></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>데이터를 지도에 시각화</td>
+      <td>격자 당 점수(와이파이 설치 지수) 계산</td>
+      <td>EDA 및 데이터 전처리</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="데이터-분석-과정">데이터 분석 과정</h2>
+<p>데이터 분석은 표준분석 모델을 활용해 진행하였다.</p>
+
+<p><img src="/assets/img/wifi_data_analysis.jpg" alt="data_analysis" /></p>
+
+<h3 id="데이터-전처리">데이터 전처리</h3>
+
+<p>먼저 Python을 활용하여 데이터의 결측치를 확인하였다. 격자 기반의 데이터(shp)좌표계를 QGIS로 수정하여 정밀한 격자 가늠이 되도록 하였고(단위: 100m), 카카오 API를 활용해 좌표를 획득하였다.</p>
+
+<p><img src="/assets/img/change_coordinate.jpg" alt="좌표계 변경" /></p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1">## 주소 -&gt; 좌표로 변환하기
+</span><span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="n">pd</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="n">np</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">requests</span>
+
+<span class="c1">## csv파일 열기 (encoding 옵션은 종류에 따라 수정)
+</span><span class="nb">file</span> <span class="o">=</span> <span class="n">pd</span><span class="p">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s">'./중구건물상세주소.csv'</span><span class="p">,</span> <span class="n">encoding</span> <span class="o">=</span> <span class="s">'CP949'</span><span class="p">)</span>
+
+<span class="n">url</span><span class="o">=</span><span class="s">'https://dapi.kakao.com/v2/local/search/address.json?query='</span> <span class="o">+</span> <span class="n">addr</span>
+<span class="n">headers</span> <span class="o">=</span> <span class="p">{</span><span class="s">"Authorization"</span><span class="p">:</span> <span class="s">"KakaoAK 057873079626a592436710b8c7b612e8"</span><span class="p">}</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">json</span><span class="p">.</span><span class="n">loads</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">requests</span><span class="p">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">).</span><span class="n">text</span><span class="p">))</span>
+<span class="n">match_first</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s">'documents'</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s">'address'</span><span class="p">]</span>
+
+<span class="c1"># 만약 찾지 못할 경우, 이전 위경도로 저장되므로 중복처리 한번 진행
+</span><span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="nb">file</span><span class="p">)):</span>
+    <span class="c1"># ---이부분은 생략가능(얼마나 진행됬는지 확인)---
+</span>    <span class="k">if</span> <span class="p">(</span><span class="n">i</span><span class="o">%</span><span class="mi">1000</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>
+        <span class="k">print</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">+</span><span class="s">" rows done"</span><span class="p">)</span>
+    <span class="c1"># ------------------------------------------------
+</span>    <span class="k">try</span><span class="p">:</span>
+        <span class="n">match_first</span><span class="o">=</span> <span class="p">{</span><span class="s">'x'</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s">'y'</span><span class="p">:</span> <span class="mi">0</span><span class="p">}</span>
+        <span class="n">addr</span> <span class="o">=</span> <span class="nb">file</span><span class="p">[</span><span class="s">'소재지'</span><span class="p">][</span><span class="n">i</span><span class="p">]</span>
+        <span class="n">url</span><span class="o">=</span><span class="s">'https://dapi.kakao.com/v2/local/search/address.json?query='</span> <span class="o">+</span> <span class="n">addr</span>
+        <span class="n">headers</span> <span class="o">=</span> <span class="p">{</span><span class="s">"Authorization"</span><span class="p">:</span> <span class="s">"KakaoAK 057873079626a592436710b8c7b612e8"</span><span class="p">}</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">json</span><span class="p">.</span><span class="n">loads</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">requests</span><span class="p">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">headers</span><span class="o">=</span><span class="n">headers</span><span class="p">).</span><span class="n">text</span><span class="p">))</span>
+        <span class="n">match_first</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s">'documents'</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s">'address'</span><span class="p">]</span>
+
+        <span class="c1">## 데이터 추가
+</span>        <span class="nb">file</span><span class="p">[</span><span class="s">'위도'</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">match_first</span><span class="p">[</span><span class="s">'y'</span><span class="p">]</span>
+        <span class="nb">file</span><span class="p">[</span><span class="s">'경도'</span><span class="p">][</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">match_first</span><span class="p">[</span><span class="s">'x'</span><span class="p">]</span>
+        
+    <span class="k">except</span> <span class="nb">IndexError</span><span class="p">:</span>
+        <span class="k">pass</span>
+</code></pre></div></div>
+
+<h3 id="eda">EDA</h3>
+
+<p>전처리가 완료된 데이터로 간단한 데이터 탐색을 진행하였다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th><img src="/assets/img/wifi_eda.jpg" alt="wifi_eda_1" /></th>
+      <th><img src="/assets/img/wifi_eda1.jpg" alt="wifi_eda_2" /></th>
+      <th><img src="/assets/img/wifi_eda2.jpg" alt="wifi_eda_3" /></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td> </td>
+      <td> </td>
+      <td> </td>
+    </tr>
+  </tbody>
+</table>
+
+<p>현재(2020.10 기준) 가장 와이파이가 많이 설치된 지역은 북성동 1가였고, 그 뒤를 향동가, 사동, 운복동이 이었다. 이 지역들을 지도에 표시해보니 영종도와 내륙 지역에 다음과 같이 나타났다.</p>
+
+<h3 id="데이터-분석">데이터 분석</h3>
+
+<p>Wayfarers lyft DIY sriracha succulents twee adaptogen crucifix gastropub actually hexagon raclette franzen polaroid la croix. Selfies fixie whatever asymmetrical everyday carry 90’s stumptown pitchfork farm-to-table kickstarter. Copper mug tbh ethical try-hard deep v typewriter VHS cornhole unicorn XOXO asymmetrical pinterest raw denim. Skateboard small batch man bun polaroid neutra. Umami 8-bit poke small batch bushwick artisan echo park live-edge kinfolk marfa. Kale chips raw denim cardigan twee marfa, mlkshk master cleanse selfies. Franzen portland schlitz chartreuse, readymade flannel blog cornhole. Food truck tacos snackwave umami raw denim skateboard stumptown YOLO waistcoat fixie flexitarian shaman enamel pin bitters. Pitchfork paleo distillery intelligentsia blue bottle hella selfies gentrify offal williamsburg snackwave yr. Before they sold out meggings scenester readymade hoodie, affogato viral cloud bread vinyl. Thundercats man bun sriracha, neutra swag knausgaard jean shorts. Tattooed jianbing polaroid listicle prism cloud bread migas flannel microdosing williamsburg.</p>
+
+<p>Echo park try-hard irony tbh vegan pok pok. Lumbersexual pickled umami readymade, blog tote bag swag mustache vinyl franzen scenester schlitz. Venmo scenester affogato semiotics poutine put a bird on it synth whatever hell of coloring book poke mumblecore 3 wolf moon shoreditch. Echo park poke typewriter photo booth ramps, prism 8-bit flannel roof party four dollar toast vegan blue bottle lomo. Vexillologist PBR&amp;B post-ironic wolf artisan semiotics craft beer selfies. Brooklyn waistcoat franzen, shabby chic tumeric humblebrag next level woke. Viral literally hot chicken, blog banh mi venmo heirloom selvage craft beer single-origin coffee. Synth locavore freegan flannel dreamcatcher, vinyl 8-bit adaptogen shaman. Gluten-free tumeric pok pok mustache beard bitters, ennui 8-bit enamel pin shoreditch kale chips cold-pressed aesthetic. Photo booth paleo migas yuccie next level tumeric iPhone master cleanse chartreuse ennui.</p>
+:ET
