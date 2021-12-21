@@ -1,0 +1,447 @@
+I"G�<h2 id="개요">개요</h2>
+
+<p>인천 중구의 민원을 혜안(공무원을 위한 빅데이터 플랫폼. 내부망으로만 접속이 가능하다.)으로 분석한 결과, 주차 관련 민원이 가장 많음을 알 수 있었다. 때문에 이 프로젝트의 원래 목적은 민원의 절대다수를 차지하는 주차민원의 빈도수 및 발생 지역, 발생 유형을 EDA를 통해 나타내는 것이었다. 그런데 이 프로젝트를 진행하면서, 데이터 전처리를 하다 문득 이런 생각이 들었다.</p>
+
+<blockquote>
+  <p>만약 민원을 자동 분류하는 시스템이 있다면, 담당 공무원의 일도 훨씬 줄어들지 않을까?</p>
+</blockquote>
+
+<p>이 의견을 같이 일하는 인턴에게 말하자, 일단 되든안되든 한번 해보자고 했고 그렇게 우리는 보름만에 끝날 수도 있었던 프로젝트를 한달동안 끌고 가게 되었다. 결말부터 스포하자면, 그다지 결과는 좋지 않았다. 하지만 딥러닝에서 배웠던 모델 생성과 학습을 드디어 실전에서 한번 써먹어보는 좋은 경험이 되었다.</p>
+
+<p>해당 프로젝트는 와이파이 입지선정 프로젝트와 마찬가지로 보안 규정에 따라 전체 코드와 데이터를 공개할 수는 없지만(Github에도 코드를 업로드하지 못했다.), 최대한 자세히 소개해보도록 하겠다. 또한 사전에 담당자님으로부터 전달받은 raw data에는 이미 개인정보 보호를 위한 익명화가 되어 있었고, 데이터 분석을 위한 필수 데이터를 제외한 정보는 삭제되어 있었음을 알린다.</p>
+
+<h2 id="사용-데이터-및-기술">사용 데이터 및 기술</h2>
+
+<p>사용 데이터: 인천 중구 민원 데이터(개인정보 익명화 및 불필요한 정보 삭제)</p>
+
+<p>사용 기술은 다음과 같다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th><img src="/assets/img/QGIS.jpg" alt="QGIS" /></th>
+      <th><img src="/assets/img/Python.png" alt="Python" /></th>
+      <th><img src="/assets/img/tensorflow.png" alt="tensorflow" /></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>데이터를 지도에 시각화</td>
+      <td>EDA 및 데이터 전처리</td>
+      <td>데이터 모델링 및 학습</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="데이터-전처리">데이터 전처리</h2>
+
+<p>데이터 전처리에 대해선 민원 데이터다 보니 자세한 언급은 할 수 없다. 일단 데이터의 결측치를 제거하였다. 민원 내용이 빈 데이터들이 조금 있었고, 중복으로 같은 민원이 여러번 들어온 경우 하나를 남기고 삭제하였다. 담당부서가 정해지지 않은 데이터가 있었는데 그런 데이터의 경우 따로 분류하여 부서 코드와, 혹은 그것도 없다면 민원 내용을 토대로 우리가 임의로 부서를 분류하였다. 바로 이 과정에서 민원 자동 분류 시스템을 고려하게 되었다. 이후 위치정보를 알 수 있는 주차 민원만 골라 EDA를 진행하였다. 위치정보를 좌표로 변환하는 건 저번 와이파이 설치 프로젝트에서와 같이 카카오 api를 이용하였다.(https://suhae-bae.github.io/%EC%9D%B8%EC%B2%9C-%EC%A4%91%EA%B5%AC%EC%B2%AD-%EA%B3%B5%EA%B3%B5-%EC%99%80%EC%9D%B4%ED%8C%8C%EC%9D%B4-%EC%9E%85%EC%A7%80%EC%84%A0%EC%A0%95/ 참고)</p>
+
+<p>이걸 자세히 적을 수 없어서 굉장히 짧게 써졌지만, 실제로는 데이터 전처리에 상당한 시간이 걸렸다.</p>
+
+<h2 id="주차민원-eda">주차민원 EDA</h2>
+
+<h3 id="주차민원-동별-발생-빈도수-by-qgis">주차민원 동별 발생 빈도수 (By. QGIS)</h3>
+
+<p><img src="/assets/img/minwon_count.jpg" alt="minwon_count" /></p>
+
+<p>총 36174개의 민원 중 위치정보를 알 수 있는 주차민원 13119건을 대상으로 분석을 진행하였다. 지도에 주차민원 발생 지역을 모두 표시한 다음, 동별로 그 수를 세게 하여 빈도가 많을 수록 진한 색으로 표시하게 했다. 그 결과, 운서동, 영종1동, 신흥동에서 주차민원이 다수 발생한 것으로 나타났다.</p>
+
+<h3 id="주차민원-발생-유형-및-부서">주차민원 발생 유형 및 부서</h3>
+
+<p>python으로 어떤 유형의 민원이 가장 많이 발생했는지(민원 제목이 민원 유형이라 이것으로 분석했다), 어떤 부서에서 민원을 많이 처리했는지를 알아보기 위해 간단하게 그래프로 나타내보았다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># 패키지 로드
+</span><span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="n">pd</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="n">np</span>
+<span class="kn">import</span> <span class="nn">matplotlib</span> <span class="k">as</span> <span class="n">mpl</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="n">plt</span>
+<span class="kn">import</span> <span class="nn">matplotlib.font_manager</span> <span class="k">as</span> <span class="n">fm</span>
+
+<span class="c1"># 데이터 읽어오기
+</span><span class="n">data</span> <span class="o">=</span> <span class="n">pd</span><span class="p">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s">"주차민원.csv"</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s">"cp949"</span><span class="p">)</span>
+
+
+<span class="c1"># 민원 유형
+</span><span class="n">data</span><span class="p">[</span><span class="s">'민원제목'</span><span class="p">].</span><span class="n">value_counts</span><span class="p">().</span><span class="n">nlargest</span><span class="p">(</span><span class="mi">10</span><span class="p">).</span><span class="n">plot</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s">'bar'</span><span class="p">)</span>
+
+<span class="c1"># 처리부서
+</span><span class="n">data</span><span class="p">[</span><span class="s">'처리부서명'</span><span class="p">].</span><span class="n">value_counts</span><span class="p">().</span><span class="n">nlargest</span><span class="p">(</span><span class="mi">10</span><span class="p">).</span><span class="n">plot</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="s">'bar'</span><span class="p">)</span>
+
+</code></pre></div></div>
+
+<table>
+  <tbody>
+    <tr>
+      <td><img src="/assets/img/minwon_type.png" alt="minwon_type" /></td>
+      <td><img src="/assets/img/minwon_dep.png" alt="minwon_dep" /></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>민원 유형의 경우, 장애인 전용구역 불법주차 민원이 가장 많았고, 그 뒤를 불법주차, 불법정차가 이었다.</p>
+
+<p>처리 부서의 경우, 행정복지국의 어르신장애과가 가장 많이 처리했었고, 그 다음으로는 복지경제국 어르신장애인과, 도시재생국 교통운수과, 국제도시건설국 교통과, 국제도시국 교통지적과가 민원을 많이 처리했다.</p>
+
+<h2 id="민원-자동-처리">민원 자동 처리</h2>
+
+<h3 id="1-키워드-추출하기">1. 키워드 추출하기</h3>
+
+<p>키워드 추출은 나보다는 같은 인턴분께서 많이 도와주셨다. 가장 먼저 민원 내용에서 키워드를 추출하도록 했다. 키워드를 추출하기 위해 konlpy와 sklearn을 활용하였다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="n">pd</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="n">np</span>
+
+<span class="kn">from</span> <span class="nn">konlpy.tag</span> <span class="kn">import</span> <span class="n">Kkma</span>
+<span class="kn">from</span> <span class="nn">konlpy.tag</span> <span class="kn">import</span> <span class="n">Twitter</span>
+<span class="kn">from</span> <span class="nn">sklearn.feature_extraction.text</span> <span class="kn">import</span> <span class="n">TfidfVectorizer</span>
+<span class="kn">from</span> <span class="nn">sklearn.feature_extraction.text</span> <span class="kn">import</span> <span class="n">CountVectorizer</span>
+<span class="kn">from</span> <span class="nn">sklearn.preprocessing</span> <span class="kn">import</span> <span class="n">normalize</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="n">np</span>
+<span class="kn">from</span> <span class="nn">krwordrank.word</span> <span class="kn">import</span> <span class="n">KRWordRank</span>
+
+<span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="p">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s">"민원전처리.csv"</span><span class="p">,</span> <span class="n">encoding</span> <span class="o">=</span> <span class="s">'cp949'</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>민원에서 키워드를 추출하기 위해 불용언들을 모두 제거하였다. 또한 띄어쓰기가 과도하게 된 민원들의 내용을 전처리 하였다. 줄바꿈 문자를 키워드로 인지할 수 있기에, 줄바꿈 문자를 모두 공백으로 전처리 하였다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># 민원 내용만 뽑아서 리스트로 만듦
+</span><span class="n">a</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">df2</span><span class="p">[</span><span class="s">'민원내용'</span><span class="p">])</span>
+
+<span class="c1"># 민원 전처리
+</span><span class="n">c</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)):</span>
+    <span class="n">c</span><span class="p">.</span><span class="n">append</span><span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="n">i</span><span class="p">].</span><span class="n">replace</span><span class="p">(</span><span class="s">'</span><span class="se">\n</span><span class="s">'</span><span class="p">,</span><span class="s">''</span><span class="p">).</span><span class="n">replace</span><span class="p">(</span><span class="s">'.'</span><span class="p">,</span><span class="s">' '</span><span class="p">).</span><span class="n">replace</span><span class="p">(</span><span class="s">' '</span><span class="p">,</span><span class="s">' '</span><span class="p">))</span>
+</code></pre></div></div>
+
+<p>이후 구글링과 한 티스토리 개발자의 도움으로 키워드를 추출하는 코드를 만들었다. 해당 코드는 민원 내용에서 10개의 핵심 키워드를 추출하는 코드이다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># 문장을 자르는 클래스
+</span><span class="k">class</span> <span class="nc">SentenceTokenizer</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">kkma</span> <span class="o">=</span> <span class="n">Kkma</span><span class="p">()</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">twitter</span> <span class="o">=</span> <span class="n">Twitter</span><span class="p">()</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">stopwords</span> <span class="o">=</span> <span class="p">[</span><span class="s">'중인'</span> <span class="p">,</span><span class="s">'만큼'</span><span class="p">,</span> <span class="s">'마찬가지'</span><span class="p">,</span> <span class="s">"아"</span><span class="p">,</span> <span class="s">"휴"</span><span class="p">,</span> <span class="s">"아이구"</span><span class="p">,</span> <span class="s">"아이쿠"</span><span class="p">,</span> <span class="s">"아이고"</span><span class="p">,</span> <span class="s">"어"</span><span class="p">,</span> <span class="s">"나"</span><span class="p">,</span> <span class="s">"우리"</span><span class="p">,</span> <span class="s">"저희"</span><span class="p">,</span> <span class="s">"따라"</span><span class="p">,</span> <span class="s">"의해"</span><span class="p">,</span> <span class="s">"을"</span><span class="p">,</span> <span class="s">"를"</span><span class="p">,</span> <span class="s">"에"</span><span class="p">,</span> <span class="s">"의"</span><span class="p">,</span> <span class="s">"가"</span><span class="p">,]</span>
+        
+	<span class="k">def</span> <span class="nf">url2sentences</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">):</span>
+		<span class="n">article</span> <span class="o">=</span> <span class="n">Article</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">language</span><span class="o">=</span><span class="s">'ko'</span><span class="p">)</span>
+		<span class="n">article</span><span class="p">.</span><span class="n">download</span><span class="p">()</span>
+		<span class="n">article</span><span class="p">.</span><span class="n">parse</span><span class="p">()</span>
+		<span class="n">sentences</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">kkma</span><span class="p">.</span><span class="n">sentences</span><span class="p">(</span><span class="n">article</span><span class="p">.</span><span class="n">text</span><span class="p">)</span>
+        
+		<span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">sentences</span><span class="p">)):</span>
+			<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sentences</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span> <span class="o">&lt;=</span> <span class="mi">10</span><span class="p">:</span>
+				<span class="n">sentences</span><span class="p">[</span><span class="n">idx</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="p">(</span><span class="s">' '</span> <span class="o">+</span> <span class="n">sentences</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
+				<span class="n">sentences</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="s">''</span>
+		<span class="k">return</span> <span class="n">sentences</span>
+    
+	<span class="k">def</span> <span class="nf">text2sentences</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">):</span>
+		<span class="n">sentences</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">kkma</span><span class="p">.</span><span class="n">sentences</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+		<span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">sentences</span><span class="p">)):</span>
+			<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sentences</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span> <span class="o">&lt;=</span> <span class="mi">10</span><span class="p">:</span>
+				<span class="n">sentences</span><span class="p">[</span><span class="n">idx</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="p">(</span><span class="s">' '</span> <span class="o">+</span> <span class="n">sentences</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
+				<span class="n">sentences</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="s">''</span>
+                
+		<span class="k">return</span> <span class="n">sentences</span>
+    
+<span class="k">def</span> <span class="nf">get_nouns</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sentences</span><span class="p">):</span>
+	<span class="n">nouns</span> <span class="o">=</span> <span class="p">[]</span>
+	<span class="k">for</span> <span class="n">sentence</span> <span class="ow">in</span> <span class="n">sentences</span><span class="p">:</span>
+		<span class="k">if</span> <span class="n">sentence</span> <span class="ow">is</span> <span class="ow">not</span> <span class="s">''</span><span class="p">:</span>
+			<span class="n">nouns</span><span class="p">.</span><span class="n">append</span><span class="p">(</span><span class="s">' '</span><span class="p">.</span><span class="n">join</span><span class="p">([</span><span class="n">noun</span> <span class="k">for</span> <span class="n">noun</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">.</span><span class="n">twitter</span><span class="p">.</span><span class="n">nouns</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">sentence</span><span class="p">))</span>
+<span class="k">if</span> <span class="n">noun</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">.</span><span class="n">stopwords</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">noun</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">]))</span>
+	<span class="k">return</span> <span class="n">nouns</span>
+
+
+
+<span class="c1"># 그래프를 그려 벡터 유사도를 판단하는 클래스
+</span><span class="k">class</span> <span class="nc">GraphMatrix</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">tfidf</span> <span class="o">=</span> <span class="n">TfidfVectorizer</span><span class="p">()</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">cnt_vec</span> <span class="o">=</span> <span class="n">CountVectorizer</span><span class="p">()</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">graph_sentence</span> <span class="o">=</span> <span class="p">[]</span>
+        
+	<span class="k">def</span> <span class="nf">build_sent_graph</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sentence</span><span class="p">):</span>
+		<span class="n">tfidf_mat</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">tfidf</span><span class="p">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">sentence</span><span class="p">).</span><span class="n">toarray</span><span class="p">()</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">graph_sentence</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">dot</span><span class="p">(</span><span class="n">tfidf_mat</span><span class="p">,</span> <span class="n">tfidf_mat</span><span class="p">.</span><span class="n">T</span><span class="p">)</span>
+		<span class="k">return</span> <span class="bp">self</span><span class="p">.</span><span class="n">graph_sentence</span>
+    
+	<span class="k">def</span> <span class="nf">build_words_graph</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sentence</span><span class="p">):</span>
+		<span class="n">cnt_vec_mat</span> <span class="o">=</span> <span class="n">normalize</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">cnt_vec</span><span class="p">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">sentence</span><span class="p">).</span><span class="n">toarray</span><span class="p">().</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+		<span class="n">vocab</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">cnt_vec</span><span class="p">.</span><span class="n">vocabulary_</span>
+		<span class="k">return</span> <span class="n">np</span><span class="p">.</span><span class="n">dot</span><span class="p">(</span><span class="n">cnt_vec_mat</span><span class="p">.</span><span class="n">T</span><span class="p">,</span> <span class="n">cnt_vec_mat</span><span class="p">),</span> <span class="p">{</span><span class="n">vocab</span><span class="p">[</span><span class="n">word</span><span class="p">]</span> <span class="p">:</span> <span class="n">word</span> <span class="k">for</span> <span class="n">word</span> <span class="ow">in</span> <span class="n">vocab</span><span class="p">}</span>
+    
+<span class="c1"># 순위를 매기는 클래스
+</span><span class="k">class</span> <span class="nc">Rank</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+	<span class="k">def</span> <span class="nf">get_ranks</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">graph</span><span class="p">,</span> <span class="n">d</span><span class="o">=</span><span class="mf">0.85</span><span class="p">):</span> <span class="c1"># d = damping factor
+</span>		<span class="n">A</span> <span class="o">=</span> <span class="n">graph</span>
+		<span class="n">matrix_size</span> <span class="o">=</span> <span class="n">A</span><span class="p">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+		<span class="k">for</span> <span class="nb">id</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">matrix_size</span><span class="p">):</span>
+			<span class="n">A</span><span class="p">[</span><span class="nb">id</span><span class="p">,</span> <span class="nb">id</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span> <span class="c1"># diagonal 부분을 0으로
+</span>			<span class="n">link_sum</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="nb">sum</span><span class="p">(</span><span class="n">A</span><span class="p">[:,</span><span class="nb">id</span><span class="p">])</span> <span class="c1"># A[:, id] = A[:][id]
+</span>			<span class="k">if</span> <span class="n">link_sum</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+				<span class="n">A</span><span class="p">[:,</span> <span class="nb">id</span><span class="p">]</span> <span class="o">/=</span> <span class="n">link_sum</span>
+			<span class="n">A</span><span class="p">[:,</span> <span class="nb">id</span><span class="p">]</span> <span class="o">*=</span> <span class="o">-</span><span class="n">d</span>
+			<span class="n">A</span><span class="p">[</span><span class="nb">id</span><span class="p">,</span> <span class="nb">id</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+            
+		<span class="n">B</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="n">d</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="p">.</span><span class="n">ones</span><span class="p">((</span><span class="n">matrix_size</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+		<span class="n">ranks</span> <span class="o">=</span> <span class="n">np</span><span class="p">.</span><span class="n">linalg</span><span class="p">.</span><span class="n">solve</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">B</span><span class="p">)</span> <span class="c1"># 연립방정식 Ax = b
+</span>		<span class="k">return</span> <span class="p">{</span><span class="n">idx</span><span class="p">:</span> <span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">ranks</span><span class="p">)}</span>
+    
+<span class="c1"># 텍스트 키워드를 뽑는 클래스
+</span><span class="k">class</span> <span class="nc">TextRank</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+	<span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">):</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">sent_tokenize</span> <span class="o">=</span> <span class="n">SentenceTokenizer</span><span class="p">()</span>
+		<span class="k">if</span> <span class="n">text</span><span class="p">[:</span><span class="mi">5</span><span class="p">]</span> <span class="ow">in</span> <span class="p">(</span><span class="s">'http:'</span><span class="p">,</span> <span class="s">'https'</span><span class="p">):</span>
+			<span class="bp">self</span><span class="p">.</span><span class="n">sentences</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">sent_tokenize</span><span class="p">.</span><span class="n">url2sentences</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+		<span class="k">else</span><span class="p">:</span>
+			<span class="bp">self</span><span class="p">.</span><span class="n">sentences</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">sent_tokenize</span><span class="p">.</span><span class="n">text2sentences</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">nouns</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">sent_tokenize</span><span class="p">.</span><span class="n">get_nouns</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">sentences</span><span class="p">)</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">graph_matrix</span> <span class="o">=</span> <span class="n">GraphMatrix</span><span class="p">()</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">sent_graph</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">graph_matrix</span><span class="p">.</span><span class="n">build_sent_graph</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">nouns</span><span class="p">)</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">words_graph</span><span class="p">,</span> <span class="bp">self</span><span class="p">.</span><span class="n">idx2word</span> <span class="o">=</span> 	<span class="bp">self</span><span class="p">.</span><span class="n">graph_matrix</span><span class="p">.</span><span class="n">build_words_graph</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">nouns</span><span class="p">)</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">rank</span> <span class="o">=</span> <span class="n">Rank</span><span class="p">()</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">sent_rank_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">rank</span><span class="p">.</span><span class="n">get_ranks</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">sent_graph</span><span class="p">)</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">sorted_sent_rank_idx</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">sent_rank_idx</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">k</span><span class="p">:</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">sent_rank_idx</span><span class="p">[</span><span class="n">k</span><span class="p">],</span> <span class="n">reverse</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">word_rank_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="p">.</span><span class="n">rank</span><span class="p">.</span><span class="n">get_ranks</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">words_graph</span><span class="p">)</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">sorted_word_rank_idx</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">word_rank_idx</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">k</span><span class="p">:</span>
+		<span class="bp">self</span><span class="p">.</span><span class="n">word_rank_idx</span><span class="p">[</span><span class="n">k</span><span class="p">],</span> <span class="n">reverse</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+        
+	<span class="k">def</span> <span class="nf">summarize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sent_num</span><span class="o">=</span><span class="mi">3</span><span class="p">):</span>
+		<span class="n">summary</span> <span class="o">=</span> <span class="p">[]</span>
+		<span class="n">index</span><span class="o">=</span><span class="p">[]</span>
+		<span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">.</span><span class="n">sorted_sent_rank_idx</span><span class="p">[:</span><span class="n">sent_num</span><span class="p">]:</span>
+			<span class="n">index</span><span class="p">.</span><span class="n">append</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span>
+		<span class="n">index</span><span class="p">.</span><span class="n">sort</span><span class="p">()</span>
+        
+		<span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">index</span><span class="p">:</span>
+			<span class="n">summary</span><span class="p">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">sentences</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
+		<span class="k">return</span> <span class="n">summary</span>
+    
+	<span class="k">def</span> <span class="nf">keywords</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">word_num</span><span class="o">=</span><span class="mi">10</span><span class="p">):</span>
+		<span class="n">rank</span> <span class="o">=</span> <span class="n">Rank</span><span class="p">()</span>
+		<span class="n">rank_idx</span> <span class="o">=</span> <span class="n">rank</span><span class="p">.</span><span class="n">get_ranks</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">words_graph</span><span class="p">)</span>
+		<span class="n">sorted_rank_idx</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">rank_idx</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">k</span><span class="p">:</span> <span class="n">rank_idx</span><span class="p">[</span><span class="n">k</span><span class="p">],</span> <span class="n">reverse</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+		<span class="n">keywords</span> <span class="o">=</span> <span class="p">[]</span>
+		<span class="n">index</span><span class="o">=</span><span class="p">[]</span>
+        
+		<span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">sorted_rank_idx</span><span class="p">[:</span><span class="n">word_num</span><span class="p">]:</span>
+			<span class="n">index</span><span class="p">.</span><span class="n">append</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span>
+		<span class="c1">#index.sort()
+</span>
+		<span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">index</span><span class="p">:</span>
+			<span class="n">keywords</span><span class="p">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="p">.</span><span class="n">idx2word</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
+		<span class="k">return</span> <span class="n">keywords</span>
+
+<span class="n">출처</span> <span class="p">:</span> <span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">excelsior</span><span class="o">-</span><span class="n">cjh</span><span class="p">.</span><span class="n">tistory</span><span class="p">.</span><span class="n">com</span><span class="o">/</span><span class="mi">93</span>
+</code></pre></div></div>
+
+<p>이후 생성될 키워드가 담길 빈 리스트를 생성한 뒤, 위의 알고리즘으로 키워드를 추출하여 리스트에 담을 수 있게 하였다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># 키워드가 담길 빈 리스트 생성
+</span><span class="n">b</span> <span class="o">=</span> <span class="p">[]</span>
+
+<span class="c1"># 알고리즘 돌릴 갯수 설정
+</span><span class="n">num</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num</span><span class="p">):</span>
+	<span class="n">url</span> <span class="o">=</span> <span class="n">c</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+    
+	<span class="k">try</span><span class="p">:</span>
+		<span class="n">textrank</span> <span class="o">=</span> <span class="n">TextRank</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+        
+		<span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">textrank</span><span class="p">.</span><span class="n">summarize</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+			<span class="k">print</span><span class="p">(</span><span class="n">row</span><span class="p">)</span>
+			<span class="k">print</span><span class="p">()</span>
+			<span class="k">print</span><span class="p">(</span><span class="s">'keywords :'</span><span class="p">,</span><span class="n">textrank</span><span class="p">.</span><span class="n">keywords</span><span class="p">())</span>
+			<span class="n">b</span><span class="p">.</span><span class="n">append</span><span class="p">(</span><span class="n">textrank</span><span class="p">.</span><span class="n">keywords</span><span class="p">())</span>
+            
+	<span class="k">except</span> <span class="nb">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+		<span class="n">b</span><span class="p">.</span><span class="n">append</span><span class="p">(</span><span class="s">'오류'</span><span class="p">)</span>
+		<span class="k">pass</span>
+</code></pre></div></div>
+
+<p>새로운 키워드가 잘 추출되는지 보기 위해서 예시로 민원을 작성하였다. 이에 [구청, 악취, 인천, 조취]의 키워드가 결과값으로 추출되었다. 이런식으로 추출된 키워드를 중심으로 학습을 시켜, 적절한 부서코드가 부여되게 하는 것을 목표로 하였다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># 새로운 민원 키워드 테스트
+</span><span class="n">url</span> <span class="o">=</span> <span class="s">'인천 중구청 앞에서 악취가 너무 심하게 나요 조취 해주세요'</span>
+
+<span class="n">textrank</span> <span class="o">=</span> <span class="n">TextRank</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+
+<span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">textrank</span><span class="p">.</span><span class="n">summarize</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+	<span class="k">print</span><span class="p">(</span><span class="n">row</span><span class="p">)</span>
+	<span class="k">print</span><span class="p">()</span>
+	<span class="k">print</span><span class="p">(</span><span class="s">'keywords :'</span><span class="p">,</span><span class="n">textrank</span><span class="p">.</span><span class="n">keywords</span><span class="p">())</span>
+</code></pre></div></div>
+
+<p><img src="/assets/img/minwon_test.png" alt="minwon_test" /></p>
+
+<h3 id="학습-및-모델링">학습 및 모델링</h3>
+
+<p>내가 주도적으로 담당한 부분이 학습 및 모델링 부분이다. 솔직히 많이 부족하고 결과가 원하는만큼 정확하게 나오지는 않았지만, 그래도 시도했다는데 의의를 두어 작성해두려 한다.</p>
+
+<p>먼저 민원내용에 따른 자동 분류기를 만들기 위해 텐서플로우의 다음과 같은 라이브러리를 사용하였다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kn">from</span> <span class="nn">tensorflow.keras.layers</span> <span class="kn">import</span> <span class="n">Embedding</span><span class="p">,</span> <span class="n">Dense</span><span class="p">,</span> <span class="n">LSTM</span>
+<span class="kn">from</span> <span class="nn">tensorflow.keras.models</span> <span class="kn">import</span> <span class="n">Sequential</span>
+<span class="kn">from</span> <span class="nn">tensorflow.keras.models</span> <span class="kn">import</span> <span class="n">load_model</span>
+<span class="kn">from</span> <span class="nn">tensorflow.keras.callbacks</span> <span class="kn">import</span> <span class="n">EarlyStopping</span><span class="p">,</span> <span class="n">ModelCheckpoint</span>
+</code></pre></div></div>
+
+<p>민원 키워드 분류를 하기 위한 프로세스는 다음과 같이 이루어진다.</p>
+
+<h4 id="데이터-로드--텍스트-정수-인코딩--라벨-원핫-인코딩one-hot-encoding--모델-만들기--모델-검증">데이터 로드 → 텍스트 정수 인코딩 → 라벨 원핫 인코딩(One-Hot Encoding) → 모델 만들기 → 모델 검증</h4>
+
+<p><strong>데이터로드</strong>: 판다스 데이터 프레임의 형태로 [단어 - 부서코드]가 연결되어 있는 형태로 존재하여야 한다. 키워드를 추출한 후에 각각의 부서코드와 연결하여 기계가 학습할 수 있는 형태로 변환해준다. 그리고, 테스트와 훈련을 진행할 파일의 비율을 2:8정도로 분리하였다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># 데이터 로드 및 정제
+</span><span class="n">raw_data</span> <span class="o">=</span> <span class="n">pd</span><span class="p">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s">"민원키워드제목내용추가.csv"</span><span class="p">,</span> <span class="n">encoding</span> <span class="o">=</span> <span class="s">'cp949'</span><span class="p">)</span>
+<span class="n">raw_data</span> <span class="o">=</span> <span class="n">raw_data</span><span class="p">[</span><span class="n">raw_data</span><span class="p">[</span><span class="s">'부서코드'</span><span class="p">]</span> <span class="o">!=</span> <span class="s">'주관'</span><span class="p">]</span>
+<span class="n">raw_data_revise</span> <span class="o">=</span> <span class="n">raw_data</span><span class="p">[</span><span class="n">raw_data</span><span class="p">[</span><span class="s">'9'</span><span class="p">].</span><span class="n">isnull</span><span class="p">()</span> <span class="o">==</span> <span class="bp">False</span><span class="p">].</span><span class="n">reset_index</span><span class="p">().</span><span class="n">drop</span><span class="p">(</span><span class="n">raw_</span>
+<span class="n">data</span><span class="p">.</span><span class="n">columns</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="n">axis</span> <span class="o">=</span> <span class="s">'columns'</span><span class="p">)</span>
+<span class="n">raw_data_revise</span> <span class="o">=</span> <span class="n">raw_data_revise</span><span class="p">.</span><span class="n">drop</span><span class="p">([</span><span class="s">'index'</span><span class="p">],</span> <span class="n">axis</span> <span class="o">=</span> <span class="s">'columns'</span><span class="p">)</span>
+<span class="n">raw_data_revise</span><span class="p">[</span><span class="n">raw_data_revise</span><span class="p">[</span><span class="s">'부서코드'</span><span class="p">]</span> <span class="o">==</span> <span class="s">'주관'</span><span class="p">]</span>
+<span class="n">raw_x</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">raw_y</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">temp_x</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="n">temp_y</span> <span class="o">=</span> <span class="p">[]</span>
+
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">raw_data_revise</span><span class="p">)):</span>
+	<span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">):</span>
+		<span class="n">temp_x</span><span class="p">.</span><span class="n">append</span><span class="p">(</span><span class="n">raw_data_revise</span><span class="p">[</span><span class="s">'%d'</span> <span class="o">%</span><span class="p">(</span><span class="n">j</span><span class="p">)].</span><span class="n">loc</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+        
+        
+	<span class="n">raw_x</span><span class="p">.</span><span class="n">append</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">temp_x</span><span class="p">))</span>
+	<span class="n">raw_y</span><span class="p">.</span><span class="n">append</span><span class="p">(</span><span class="n">raw_data_revise</span><span class="p">[</span><span class="s">'부서코드'</span><span class="p">].</span><span class="n">loc</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+	<span class="n">temp_x</span> <span class="o">=</span> <span class="p">[]</span>
+    
+<span class="c1"># 데이터를 2:8로 분할
+</span><span class="kn">from</span> <span class="nn">sklearn.model_selection</span> <span class="kn">import</span> <span class="n">train_test_split</span>
+<span class="n">X_train</span><span class="p">,</span> <span class="n">X_test</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">y_test</span> <span class="o">=</span> <span class="n">train_test_split</span><span class="p">(</span><span class="n">raw_x</span><span class="p">,</span> <span class="n">raw_y</span><span class="p">,</span> <span class="n">test_size</span> <span class="o">=</span> <span class="mf">0.2</span><span class="p">,</span>
+<span class="n">random_state</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p><strong>텍스트 정수 인코딩</strong>: 기계학습을 위해 키워드를 정수 형태로 변형시켜주었다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">tokenizer</span> <span class="o">=</span> <span class="n">Tokenizer</span><span class="p">(</span><span class="n">vocab_size</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">oov_token</span> <span class="o">=</span> <span class="s">'OOV'</span><span class="p">)</span>
+<span class="n">tokenizer</span><span class="p">.</span><span class="n">fit_on_texts</span><span class="p">(</span><span class="n">X_train</span><span class="p">)</span>
+
+<span class="c1"># 텍스트 정수 인코딩
+</span><span class="n">X_train</span> <span class="o">=</span> <span class="n">tokenizer</span><span class="p">.</span><span class="n">texts_to_sequences</span><span class="p">(</span><span class="n">X_train</span><span class="p">)</span>
+<span class="n">X_test</span> <span class="o">=</span> <span class="n">tokenizer</span><span class="p">.</span><span class="n">texts_to_sequences</span><span class="p">(</span><span class="n">X_test</span><span class="p">)</span>
+
+<span class="c1"># 정수 인코딩 결과
+</span><span class="k">print</span><span class="p">(</span><span class="n">X_train</span><span class="p">[:</span><span class="mi">3</span><span class="p">])</span>
+</code></pre></div></div>
+
+<p><strong>라벨 원핫 인코딩</strong>: 각각의 라벨을 분류하기 위해 원핫 인코딩을 실시한다.  이 때, float 형태를 int 형태로 바꾸어주어야 한다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">tokenizer_y</span> <span class="o">=</span> <span class="n">Tokenizer</span><span class="p">(</span><span class="n">vocab_size</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">tokenizer_y</span><span class="p">.</span><span class="n">fit_on_texts</span><span class="p">(</span><span class="n">y_train</span><span class="p">)</span>
+
+<span class="c1"># 라벨 원핫 인코딩
+</span><span class="n">y_train</span> <span class="o">=</span> <span class="n">tokenizer_y</span><span class="p">.</span><span class="n">texts_to_sequences</span><span class="p">(</span><span class="n">y_train</span><span class="p">)</span>
+<span class="n">y_test</span> <span class="o">=</span> <span class="n">tokenizer_y</span><span class="p">.</span><span class="n">texts_to_sequences</span><span class="p">(</span><span class="n">y_test</span><span class="p">)</span>
+
+<span class="n">y_train</span> <span class="o">=</span> <span class="n">kr</span><span class="p">.</span><span class="n">utils</span><span class="p">.</span><span class="n">to_categorical</span><span class="p">(</span><span class="n">y_train</span><span class="p">)</span>
+<span class="n">y_test</span> <span class="o">=</span> <span class="n">kr</span><span class="p">.</span><span class="n">utils</span><span class="p">.</span><span class="n">to_categorical</span><span class="p">(</span><span class="n">y_test</span><span class="p">)</span>
+
+<span class="c1"># 타입 변환
+</span><span class="n">y_train</span> <span class="o">=</span> <span class="n">y_train</span><span class="p">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+<span class="n">y_test</span> <span class="o">=</span> <span class="n">y_test</span><span class="p">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+
+</code></pre></div></div>
+
+<p>원핫 인코딩 결과는 다음과 같다.</p>
+
+<p><img src="/assets/img/one-hot encoding result.jpg" alt="one-hot encoding result" /></p>
+
+<p><strong>모델 만들기</strong>: 인공 신경망 학습을 위해 사용한 모델은 다음과 같다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">model</span> <span class="o">=</span> <span class="n">Sequential</span><span class="p">()</span>
+<span class="n">model</span><span class="p">.</span><span class="n">add</span><span class="p">(</span><span class="n">Embedding</span><span class="p">(</span><span class="mi">35000</span><span class="p">,</span> <span class="mi">120</span><span class="p">))</span>
+<span class="n">model</span><span class="p">.</span><span class="n">add</span><span class="p">(</span><span class="n">LSTM</span><span class="p">(</span><span class="mi">120</span><span class="p">))</span>
+<span class="n">model</span><span class="p">.</span><span class="n">add</span><span class="p">(</span><span class="n">Dense</span><span class="p">(</span><span class="mi">89</span><span class="p">,</span> <span class="n">activation</span><span class="o">=</span><span class="s">'softmax'</span><span class="p">))</span>
+</code></pre></div></div>
+
+<p>인공 신경망은 크게 입력층, 은닉층, 출력층으로 구성되어 있다. 케라스에서는 이러한 층을 구성하기 위해 Sequential()을 사용한다. Sequential()모델은 레이어를 선형으로 연결하여 구성하는 것으로, Sequential()을 model로 선언한 뒤 model.add()를 통해 층을 추가한다.
+먼저 Embedding 층(embedding layer)을 행성하는데, Embedding 층은 단어를 밀집 벡터로 만드는 역할을 하며 워드 임베딩 작업을 수행한 뒤 3D 텐서를 리턴한다. 이 Embedding 층을 통과한 뒤 벡터의 크기는 120이 된다.
+다음으로 은닉층으로는 LSTM을 사용하였다. LSTM은 RNN(순환신경망)의 장기 의존성 문제를 해결한 모델로, 다양한 분야에서 사용된다. keras에서 import하여 사용이 가능하다.
+마지막으로 출력층으로 Dense 레이어를 사용하였으며, 활성화 함수(activation function)으로 softmax를 사용하였다.
+이렇게 만들어진 모델은 다음과 같은 구성을 가진다.</p>
+
+<p><img src="/assets/img/minwon_model.jpg" alt="minwon_model" /></p>
+
+<p>또한, 과적합(Overfitting)을 예방하기 위해 EarlyStopping을 사용하여 과적합이 발생하면 자동으로 학습을 멈추고 모델을 저장하게 하였다.</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c1"># 과적합 예방을 위한 EarlyStopping
+</span><span class="n">es</span> <span class="o">=</span> <span class="n">EarlyStopping</span><span class="p">(</span><span class="n">monitor</span><span class="o">=</span><span class="s">'val_loss'</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s">'min'</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">patience</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+<span class="n">mc</span> <span class="o">=</span> <span class="n">ModelCheckpoint</span><span class="p">(</span><span class="s">'best_model.h5'</span><span class="p">,</span> <span class="n">monitor</span><span class="o">=</span><span class="s">'val_acc'</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s">'max'</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">save_best_only</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p><strong>모델 검증</strong>: optimizer로는 rmsprop을 사용하고, 총 10번동안 반복하여 학습하되 과적합이 발생하면 멈추고 모델을 저장하게 하였다.</p>
+
+<p>사족이지만 모델 학습을 위해 colab의 gpu를 사용하였다. 구글 최고!</p>
+
+<div class="language-python highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">model</span><span class="p">.</span><span class="nb">compile</span><span class="p">(</span><span class="n">optimizer</span><span class="o">=</span><span class="s">'rmsprop'</span><span class="p">,</span> <span class="n">loss</span><span class="o">=</span><span class="s">'categorical_crossentropy'</span><span class="p">,</span> <span class="n">metrics</span><span class="o">=</span><span class="p">[</span><span class="s">'accuracy'</span><span class="p">])</span>
+<span class="n">history</span> <span class="o">=</span> <span class="n">model</span><span class="p">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_train</span><span class="p">,</span> <span class="n">y_train</span><span class="p">,</span> <span class="n">epochs</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">callbacks</span><span class="o">=</span><span class="p">[</span><span class="n">es</span><span class="p">,</span> <span class="n">mc</span><span class="p">],</span> <span class="n">validation_split</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+</code></pre></div></div>
+
+<p>총 2가지의 방법으로 데이터를 구성하여 학습을 진행하였다. 하나는 해당 민원에서 뽑은 (최대)10개의 키워드를 하나의 부서 코드와 매핑시켜 학습하는 것이고(n:1), 하나는 민원에서 뽑은 (최대)10개의 키워드를 모두 개별로 하나씩 부서 코드와 매핑하여 학습을 진행하는 것이다(1:1).</p>
+
+<table>
+  <thead>
+    <tr>
+      <th><img src="/assets/img/keyword_n_1.jpg" alt="keyword_n_1" /></th>
+      <th><img src="/assets/img/keyword_1_1.jpg" alt="keyword_1_1" /></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>(최대)10개의 키워드를 하나의 부서 코드와 매핑</td>
+      <td>키워드를 개별로 하나씩 부서 코드와 매핑</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>매 학습마다 accuracy와 val_accuracy를 비교한 표는 다음과 같다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>10개의 키워드를 하나의 부서 코드와 매핑</th>
+      <th>키워드를 개별로 하나씩 부서 코드와 매핑</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><img src="/assets/img/minwon_acc_n_1.jpg" alt="minwon_acc_n_1" /></td>
+      <td><img src="/assets/img/minwon_acc_1_1.jpg" alt="minwon_acc_1_1" /></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>학습한 모델을 test set에 적용하였을 때의 정확도를 비교해 보았다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>10개의 키워드를 하나의 부서 코드와 매핑</th>
+      <th>키워드를 개별로 하나씩 부서 코드와 매핑</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><img src="/assets/img/minwon_test_result_n_1.jpg" alt="minwon_test_result_n_1" /></td>
+      <td><img src="/assets/img/minwon_test_result_1_1.jpg" alt="minwon_test_result_1_1" /></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>10개의 키워드를 하나씩 부서 코드와 매핑하여 학습을 진행하였을 때의 정확도가 키워드를 개별로 하나씩 부서 코드와 매핑하여 학습을 진행하였을 때 보다 더 높았다.</p>
+
+<h2 id="총평-및-결론">총평 및 결론</h2>
+
+<p>민원 처리기한은 정해져 있으며, 민원을 처리하는 담당자의 수도 한정되어 있다. 그런데 민원의 양은 예측 불가능하여 처리량이 예측을 넘어 과도하게 몰린다면, 민원 담당자의 업무 부담이 예상된다. 이를 해소하고자 한 방안으로, 민원의 키워드를 추출하여 자동으로 부서를 분류하는 방안을 생각해 내었다. 테스트를 위해 민원데이터를 키워드화 한 후, 컴퓨터가 분류할 수 있도록 텍스트 전처리를 했다. 89개 부서 중에서 정확하게 맞출 수 있는 확률이 49%에 이르렀다. 이는 물론 아직 인간의 수준을 넘어선 것은 아니지만, 보다 빠르게 분류하기 위한 도움은 된다고 판단되는 수준이다. 반복되는 민원유형 속에서 카테고리를 학습하고, 유사 민원이 들어왔을 때 보다 빠르게 처리할 수 있도록 계획한 프로그램의 정확도이므로, 학습 데이터가 많다면 더욱 정교해질 것으로 판단된다.</p>
+:ET

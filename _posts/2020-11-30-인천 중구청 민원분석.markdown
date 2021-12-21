@@ -1,0 +1,457 @@
+---
+layout: post
+title: 인천 중구청 주차민원분석
+date: 2020-11-30 00:00:00 +0300
+description: 인천 중구청 주차 민원분석 과정 및 결과 정리 # Add post description (optional)
+img: minwon_header.png # Add image post (optional)
+tags: [빅데이터 청년인턴, 인천 중구] # add tag 
+---
+
+## 개요
+
+인천 중구의 민원을 혜안(공무원을 위한 빅데이터 플랫폼. 내부망으로만 접속이 가능하다.)으로 분석한 결과, 주차 관련 민원이 가장 많음을 알 수 있었다. 때문에 이 프로젝트의 원래 목적은 민원의 절대다수를 차지하는 주차민원의 빈도수 및 발생 지역, 발생 유형을 EDA를 통해 나타내는 것이었다. 그런데 이 프로젝트를 진행하면서, 데이터 전처리를 하다 문득 이런 생각이 들었다.
+
+> 만약 민원을 자동 분류하는 시스템이 있다면, 담당 공무원의 일도 훨씬 줄어들지 않을까?
+
+이 의견을 같이 일하는 인턴에게 말하자, 일단 되든안되든 한번 해보자고 했고 그렇게 우리는 보름만에 끝날 수도 있었던 프로젝트를 한달동안 끌고 가게 되었다. 결말부터 스포하자면, 그다지 결과는 좋지 않았다. 하지만 딥러닝에서 배웠던 모델 생성과 학습을 드디어 실전에서 한번 써먹어보는 좋은 경험이 되었다. 
+
+해당 프로젝트는 와이파이 입지선정 프로젝트와 마찬가지로 보안 규정에 따라 전체 코드와 데이터를 공개할 수는 없지만(Github에도 코드를 업로드하지 못했다.), 최대한 자세히 소개해보도록 하겠다. 또한 사전에 담당자님으로부터 전달받은 raw data에는 이미 개인정보 보호를 위한 익명화가 되어 있었고, 데이터 분석을 위한 필수 데이터를 제외한 정보는 삭제되어 있었음을 알린다.
+
+
+
+
+
+
+
+## 사용 데이터 및 기술
+
+사용 데이터: 인천 중구 민원 데이터(개인정보 익명화 및 불필요한 정보 삭제) 
+
+사용 기술은 다음과 같다.
+
+| ![QGIS]({{site.baseurl}}/assets/img/QGIS.jpg) | ![Python]({{site.baseurl}}/assets/img/Python.png) | ![tensorflow]({{site.baseurl}}/assets/img/tensorflow.png) |
+| --------------------------------------------- | ------------------------------------------------- | --------------------------------------------------------- |
+| 데이터를 지도에 시각화                        | EDA 및 데이터 전처리                              | 데이터 모델링 및 학습                                     |
+
+
+
+
+
+
+
+## 데이터 전처리
+
+데이터 전처리에 대해선 민원 데이터다 보니 자세한 언급은 할 수 없다. 일단 데이터의 결측치를 제거하였다. 민원 내용이 빈 데이터들이 조금 있었고, 중복으로 같은 민원이 여러번 들어온 경우 하나를 남기고 삭제하였다. 담당부서가 정해지지 않은 데이터가 있었는데 그런 데이터의 경우 따로 분류하여 부서 코드와, 혹은 그것도 없다면 민원 내용을 토대로 우리가 임의로 부서를 분류하였다. 바로 이 과정에서 민원 자동 분류 시스템을 고려하게 되었다. 이후 위치정보를 알 수 있는 주차 민원만 골라 EDA를 진행하였다. 위치정보를 좌표로 변환하는 건 저번 와이파이 설치 프로젝트에서와 같이 카카오 api를 이용하였다.(https://suhae-bae.github.io/%EC%9D%B8%EC%B2%9C-%EC%A4%91%EA%B5%AC%EC%B2%AD-%EA%B3%B5%EA%B3%B5-%EC%99%80%EC%9D%B4%ED%8C%8C%EC%9D%B4-%EC%9E%85%EC%A7%80%EC%84%A0%EC%A0%95/ 참고)
+
+이걸 자세히 적을 수 없어서 굉장히 짧게 써졌지만, 실제로는 데이터 전처리에 상당한 시간이 걸렸다.
+
+
+
+
+
+
+
+## 주차민원 EDA
+
+### 주차민원 동별 발생 빈도수 (By. QGIS)
+
+![minwon_count]({{site.baseurl}}/assets/img/minwon_count.png)
+
+총 36174개의 민원 중 위치정보를 알 수 있는 주차민원 13119건을 대상으로 분석을 진행하였다. 지도에 주차민원 발생 지역을 모두 표시한 다음, 동별로 그 수를 세게 하여 빈도가 많을 수록 진한 색으로 표시하게 했다. 그 결과, 운서동, 영종1동, 신흥동에서 주차민원이 다수 발생한 것으로 나타났다.
+
+
+
+### 주차민원 발생 유형 및 부서
+
+python으로 어떤 유형의 민원이 가장 많이 발생했는지(민원 제목이 민원 유형이라 이것으로 분석했다), 어떤 부서에서 민원을 많이 처리했는지를 알아보기 위해 간단하게 그래프로 나타내보았다.
+
+```python
+# 패키지 로드
+import pandas as pd
+import numpy as np
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
+
+# 데이터 읽어오기
+data = pd.read_csv("주차민원.csv", encoding="cp949")
+
+
+# 민원 유형
+data['민원제목'].value_counts().nlargest(10).plot(kind='bar')
+
+# 처리부서
+data['처리부서명'].value_counts().nlargest(10).plot(kind='bar')
+
+```
+
+
+
+|![minwon_type]({{site.baseurl}}/assets/img/minwon_type.png)|![minwon_dep]({{site.baseurl}}/assets/img/minwon_dep.png)|
+
+민원 유형의 경우, 장애인 전용구역 불법주차 민원이 가장 많았고, 그 뒤를 불법주차, 불법정차가 이었다.
+
+처리 부서의 경우, 행정복지국의 어르신장애과가 가장 많이 처리했었고, 그 다음으로는 복지경제국 어르신장애인과, 도시재생국 교통운수과, 국제도시건설국 교통과, 국제도시국 교통지적과가 민원을 많이 처리했다.
+
+
+
+
+
+
+
+## 민원 자동 처리
+
+### 1. 키워드 추출하기
+
+키워드 추출은 나보다는 같은 인턴분께서 많이 도와주셨다. 가장 먼저 민원 내용에서 키워드를 추출하도록 했다. 키워드를 추출하기 위해 konlpy와 sklearn을 활용하였다.
+
+```python
+import pandas as pd
+import numpy as np
+
+from konlpy.tag import Kkma
+from konlpy.tag import Twitter
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.preprocessing import normalize
+import numpy as np
+from krwordrank.word import KRWordRank
+
+df = pd.read_csv("민원전처리.csv", encoding = 'cp949')
+```
+
+민원에서 키워드를 추출하기 위해 불용언들을 모두 제거하였다. 또한 띄어쓰기가 과도하게 된 민원들의 내용을 전처리 하였다. 줄바꿈 문자를 키워드로 인지할 수 있기에, 줄바꿈 문자를 모두 공백으로 전처리 하였다. 
+
+```python
+# 민원 내용만 뽑아서 리스트로 만듦
+a = list(df2['민원내용'])
+
+# 민원 전처리
+c = []
+for i in range(len(a)):
+    c.append(a[i].replace('\n','').replace('.',' ').replace(' ',' '))
+```
+
+이후 구글링과 한 티스토리 개발자의 도움으로 키워드를 추출하는 코드를 만들었다. 해당 코드는 민원 내용에서 10개의 핵심 키워드를 추출하는 코드이다.
+
+```python
+# 문장을 자르는 클래스
+class SentenceTokenizer(object):
+	def __init__(self):
+		self.kkma = Kkma()
+		self.twitter = Twitter()
+		self.stopwords = ['중인' ,'만큼', '마찬가지', "아", "휴", "아이구", "아이쿠", "아이고", "어", "나", "우리", "저희", "따라", "의해", "을", "를", "에", "의", "가",]
+        
+	def url2sentences(self, url):
+		article = Article(url, language='ko')
+		article.download()
+		article.parse()
+		sentences = self.kkma.sentences(article.text)
+        
+		for idx in range(0, len(sentences)):
+			if len(sentences[idx]) <= 10:
+				sentences[idx-1] += (' ' + sentences[idx])
+				sentences[idx] = ''
+		return sentences
+    
+	def text2sentences(self, text):
+		sentences = self.kkma.sentences(text)
+		for idx in range(0, len(sentences)):
+			if len(sentences[idx]) <= 10:
+				sentences[idx-1] += (' ' + sentences[idx])
+				sentences[idx] = ''
+                
+		return sentences
+    
+def get_nouns(self, sentences):
+	nouns = []
+	for sentence in sentences:
+		if sentence is not '':
+			nouns.append(' '.join([noun for noun in self.twitter.nouns(str(sentence))
+if noun not in self.stopwords and len(noun) > 1]))
+	return nouns
+
+
+
+# 그래프를 그려 벡터 유사도를 판단하는 클래스
+class GraphMatrix(object):
+	def __init__(self):
+		self.tfidf = TfidfVectorizer()
+		self.cnt_vec = CountVectorizer()
+		self.graph_sentence = []
+        
+	def build_sent_graph(self, sentence):
+		tfidf_mat = self.tfidf.fit_transform(sentence).toarray()
+		self.graph_sentence = np.dot(tfidf_mat, tfidf_mat.T)
+		return self.graph_sentence
+    
+	def build_words_graph(self, sentence):
+		cnt_vec_mat = normalize(self.cnt_vec.fit_transform(sentence).toarray().astype(float), axis=0)
+		vocab = self.cnt_vec.vocabulary_
+		return np.dot(cnt_vec_mat.T, cnt_vec_mat), {vocab[word] : word for word in vocab}
+    
+# 순위를 매기는 클래스
+class Rank(object):
+	def get_ranks(self, graph, d=0.85): # d = damping factor
+		A = graph
+		matrix_size = A.shape[0]
+		for id in range(matrix_size):
+			A[id, id] = 0 # diagonal 부분을 0으로
+			link_sum = np.sum(A[:,id]) # A[:, id] = A[:][id]
+			if link_sum != 0:
+				A[:, id] /= link_sum
+			A[:, id] *= -d
+			A[id, id] = 1
+            
+		B = (1-d) * np.ones((matrix_size, 1))
+		ranks = np.linalg.solve(A, B) # 연립방정식 Ax = b
+		return {idx: r[0] for idx, r in enumerate(ranks)}
+    
+# 텍스트 키워드를 뽑는 클래스
+class TextRank(object):
+	def __init__(self, text):
+		self.sent_tokenize = SentenceTokenizer()
+		if text[:5] in ('http:', 'https'):
+			self.sentences = self.sent_tokenize.url2sentences(text)
+		else:
+			self.sentences = self.sent_tokenize.text2sentences(text)
+		self.nouns = self.sent_tokenize.get_nouns(self.sentences)
+		self.graph_matrix = GraphMatrix()
+		self.sent_graph = self.graph_matrix.build_sent_graph(self.nouns)
+		self.words_graph, self.idx2word = 	self.graph_matrix.build_words_graph(self.nouns)
+		self.rank = Rank()
+		self.sent_rank_idx = self.rank.get_ranks(self.sent_graph)
+		self.sorted_sent_rank_idx = sorted(self.sent_rank_idx, key=lambda k:
+		self.sent_rank_idx[k], reverse=True)
+		self.word_rank_idx = self.rank.get_ranks(self.words_graph)
+		self.sorted_word_rank_idx = sorted(self.word_rank_idx, key=lambda k:
+		self.word_rank_idx[k], reverse=True)
+        
+	def summarize(self, sent_num=3):
+		summary = []
+		index=[]
+		for idx in self.sorted_sent_rank_idx[:sent_num]:
+			index.append(idx)
+		index.sort()
+        
+		for idx in index:
+			summary.append(self.sentences[idx])
+		return summary
+    
+	def keywords(self, word_num=10):
+		rank = Rank()
+		rank_idx = rank.get_ranks(self.words_graph)
+		sorted_rank_idx = sorted(rank_idx, key=lambda k: rank_idx[k], reverse=True)
+		keywords = []
+		index=[]
+        
+		for idx in sorted_rank_idx[:word_num]:
+			index.append(idx)
+		#index.sort()
+
+		for idx in index:
+			keywords.append(self.idx2word[idx])
+		return keywords
+
+# 출처 : https://excelsior-cjh.tistory.com/93
+```
+
+이후 생성될 키워드가 담길 빈 리스트를 생성한 뒤, 위의 알고리즘으로 키워드를 추출하여 리스트에 담을 수 있게 하였다.
+
+```python
+# 키워드가 담길 빈 리스트 생성
+b = []
+
+# 알고리즘 돌릴 갯수 설정
+num = len(a)
+
+for i in range(num):
+	url = c[i]
+    
+	try:
+		textrank = TextRank(url)
+        
+		for row in textrank.summarize(1):
+			print(row)
+			print()
+			print('keywords :',textrank.keywords())
+			b.append(textrank.keywords())
+            
+	except Exception as e:
+		b.append('오류')
+		pass
+```
+
+새로운 키워드가 잘 추출되는지 보기 위해서 예시로 민원을 작성하였다. 이에 [구청, 악취, 인천, 조취]의 키워드가 결과값으로 추출되었다. 이런식으로 추출된 키워드를 중심으로 학습을 시켜, 적절한 부서코드가 부여되게 하는 것을 목표로 하였다.
+
+```python
+# 새로운 민원 키워드 테스트
+url = '인천 중구청 앞에서 악취가 너무 심하게 나요 조취 해주세요'
+
+textrank = TextRank(url)
+
+for row in textrank.summarize(1):
+	print(row)
+	print()
+	print('keywords :',textrank.keywords())
+```
+
+![minwon_test]({{site.baseurl}}/assets/img/minwon_test.png)
+
+
+
+### 학습 및 모델링
+
+내가 주도적으로 담당한 부분이 학습 및 모델링 부분이다. 솔직히 많이 부족하고 결과가 원하는만큼 정확하게 나오지는 않았지만, 그래도 시도했다는데 의의를 두어 작성해두려 한다.
+
+먼저 민원내용에 따른 자동 분류기를 만들기 위해 텐서플로우의 다음과 같은 라이브러리를 사용하였다.
+
+```python
+from tensorflow.keras.layers import Embedding, Dense, LSTM
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.models import load_model
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+```
+
+민원 키워드 분류를 하기 위한 프로세스는 다음과 같이 이루어진다.
+
+#### 	데이터 로드 → 텍스트 정수 인코딩 → 라벨 원핫 인코딩(One-Hot Encoding) → 모델 만들기 → 모델 검증
+
+**데이터로드**: 판다스 데이터 프레임의 형태로 [단어 - 부서코드]가 연결되어 있는 형태로 존재하여야 한다. 키워드를 추출한 후에 각각의 부서코드와 연결하여 기계가 학습할 수 있는 형태로 변환해준다. 그리고, 테스트와 훈련을 진행할 파일의 비율을 2:8정도로 분리하였다.
+
+```python
+# 데이터 로드 및 정제
+raw_data = pd.read_csv("민원키워드제목내용추가.csv", encoding = 'cp949')
+raw_data = raw_data[raw_data['부서코드'] != '주관']
+raw_data_revise = raw_data[raw_data['9'].isnull() == False].reset_index().drop(raw_
+data.columns[0],axis = 'columns')
+raw_data_revise = raw_data_revise.drop(['index'], axis = 'columns')
+raw_data_revise[raw_data_revise['부서코드'] == '주관']
+raw_x = []
+raw_y = []
+temp_x = []
+temp_y = []
+
+for i in range(len(raw_data_revise)):
+	for j in range(10):
+		temp_x.append(raw_data_revise['%d' %(j)].loc[i])
+        
+        
+	raw_x.append(list(temp_x))
+	raw_y.append(raw_data_revise['부서코드'].loc[i])
+	temp_x = []
+    
+# 데이터를 2:8로 분할
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(raw_x, raw_y, test_size = 0.2,
+random_state = 0)
+```
+
+
+
+**텍스트 정수 인코딩**: 기계학습을 위해 키워드를 정수 형태로 변형시켜주었다.
+
+```python
+tokenizer = Tokenizer(vocab_size-1, oov_token = 'OOV')
+tokenizer.fit_on_texts(X_train)
+
+# 텍스트 정수 인코딩
+X_train = tokenizer.texts_to_sequences(X_train)
+X_test = tokenizer.texts_to_sequences(X_test)
+
+# 정수 인코딩 결과
+print(X_train[:3])
+```
+
+
+
+**라벨 원핫 인코딩**: 각각의 라벨을 분류하기 위해 원핫 인코딩을 실시한다.  이 때, float 형태를 int 형태로 바꾸어주어야 한다.
+
+```python
+tokenizer_y = Tokenizer(vocab_size-1)
+tokenizer_y.fit_on_texts(y_train)
+
+# 라벨 원핫 인코딩
+y_train = tokenizer_y.texts_to_sequences(y_train)
+y_test = tokenizer_y.texts_to_sequences(y_test)
+
+y_train = kr.utils.to_categorical(y_train)
+y_test = kr.utils.to_categorical(y_test)
+
+# 타입 변환
+y_train = y_train.astype(int)
+y_test = y_test.astype(int)
+
+```
+
+원핫 인코딩 결과는 다음과 같다.
+
+![one-hot encoding result]({{site.baseurl}}/assets/img/one-hot encoding result.jpg)
+
+
+
+**모델 만들기**: 인공 신경망 학습을 위해 사용한 모델은 다음과 같다.
+
+```python
+model = Sequential()
+model.add(Embedding(35000, 120))
+model.add(LSTM(120))
+model.add(Dense(89, activation='softmax'))
+```
+
+인공 신경망은 크게 입력층, 은닉층, 출력층으로 구성되어 있다. 케라스에서는 이러한 층을 구성하기 위해 Sequential()을 사용한다. Sequential()모델은 레이어를 선형으로 연결하여 구성하는 것으로, Sequential()을 model로 선언한 뒤 model.add()를 통해 층을 추가한다.
+먼저 Embedding 층(embedding layer)을 행성하는데, Embedding 층은 단어를 밀집 벡터로 만드는 역할을 하며 워드 임베딩 작업을 수행한 뒤 3D 텐서를 리턴한다. 이 Embedding 층을 통과한 뒤 벡터의 크기는 120이 된다.
+다음으로 은닉층으로는 LSTM을 사용하였다. LSTM은 RNN(순환신경망)의 장기 의존성 문제를 해결한 모델로, 다양한 분야에서 사용된다. keras에서 import하여 사용이 가능하다.
+마지막으로 출력층으로 Dense 레이어를 사용하였으며, 활성화 함수(activation function)으로 softmax를 사용하였다.
+이렇게 만들어진 모델은 다음과 같은 구성을 가진다.
+
+![minwon_model]({{site.baseurl}}/assets/img/minwon_model.jpg)
+
+또한, 과적합(Overfitting)을 예방하기 위해 EarlyStopping을 사용하여 과적합이 발생하면 자동으로 학습을 멈추고 모델을 저장하게 하였다.
+
+```python
+# 과적합 예방을 위한 EarlyStopping
+es = EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=4)
+mc = ModelCheckpoint('best_model.h5', monitor='val_acc', mode='max', verbose=1, save_best_only=True)
+```
+
+
+
+**모델 검증**: optimizer로는 rmsprop을 사용하고, 총 10번동안 반복하여 학습하되 과적합이 발생하면 멈추고 모델을 저장하게 하였다.
+
+사족이지만 모델 학습을 위해 colab의 gpu를 사용하였다. 구글 최고!
+
+```python
+model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+history = model.fit(X_train, y_train, epochs=10, batch_size=10, callbacks=[es, mc], validation_split=0.1)
+```
+
+총 2가지의 방법으로 데이터를 구성하여 학습을 진행하였다. 하나는 해당 민원에서 뽑은 (최대)10개의 키워드를 하나의 부서 코드와 매핑시켜 학습하는 것이고(n:1), 하나는 민원에서 뽑은 (최대)10개의 키워드를 모두 개별로 하나씩 부서 코드와 매핑하여 학습을 진행하는 것이다(1:1).
+
+| ![keyword_n_1]({{site.baseurl}}/assets/img/keyword_n_1.jpg) | ![keyword_1_1]({{site.baseurl}}/assets/img/keyword_1_1.jpg) |
+| ----------------------------------------------------------- | ----------------------------------------------------------- |
+| (최대)10개의 키워드를 하나의 부서 코드와 매핑               | 키워드를 개별로 하나씩 부서 코드와 매핑                     |
+
+매 학습마다 accuracy와 val_accuracy를 비교한 표는 다음과 같다.
+
+| 10개의 키워드를 하나의 부서 코드와 매핑                      | 키워드를 개별로 하나씩 부서 코드와 매핑                      |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| ![minwon_acc_n_1]({{site.baseurl}}/assets/img/minwon_acc_n_1.jpg) | ![minwon_acc_1_1]({{site.baseurl}}/assets/img/minwon_acc_1_1.jpg) |
+
+학습한 모델을 test set에 적용하였을 때의 정확도를 비교해 보았다.
+
+| 10개의 키워드를 하나의 부서 코드와 매핑                      | 키워드를 개별로 하나씩 부서 코드와 매핑                      |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| ![minwon_test_result_n_1]({{site.baseurl}}/assets/img/minwon_test_result_n_1.jpg) | ![minwon_test_result_1_1]({{site.baseurl}}/assets/img/minwon_test_result_1_1.jpg) |
+
+10개의 키워드를 하나씩 부서 코드와 매핑하여 학습을 진행하였을 때의 정확도가 키워드를 개별로 하나씩 부서 코드와 매핑하여 학습을 진행하였을 때 보다 더 높았다.
+
+
+
+
+
+
+
+## 총평 및 결론
+
+민원 처리기한은 정해져 있으며, 민원을 처리하는 담당자의 수도 한정되어 있다. 그런데 민원의 양은 예측 불가능하여 처리량이 예측을 넘어 과도하게 몰린다면, 민원 담당자의 업무 부담이 예상된다. 이를 해소하고자 한 방안으로, 민원의 키워드를 추출하여 자동으로 부서를 분류하는 방안을 생각해 내었다. 테스트를 위해 민원데이터를 키워드화 한 후, 컴퓨터가 분류할 수 있도록 텍스트 전처리를 했다. 89개 부서 중에서 정확하게 맞출 수 있는 확률이 49%에 이르렀다. 이는 물론 아직 인간의 수준을 넘어선 것은 아니지만, 보다 빠르게 분류하기 위한 도움은 된다고 판단되는 수준이다. 반복되는 민원유형 속에서 카테고리를 학습하고, 유사 민원이 들어왔을 때 보다 빠르게 처리할 수 있도록 계획한 프로그램의 정확도이므로, 학습 데이터가 많다면 더욱 정교해질 것으로 판단된다.
