@@ -1,0 +1,220 @@
+I",<p>Post-ironic jean shorts bushwick umami, synth beard austin hell of meh kitsch distillery sustainable plaid bitters. Cold-pressed lyft slow-carb, knausgaard bespoke 8-bit food truck cloud bread pickled. Taiyaki bitters trust fund heirloom craft beer single-origin coffee. Readymade fam vape blue bottle cold-pressed, flannel polaroid. Aesthetic four dollar toast semiotics af bicycle rights. Actually synth mixtape kickstarter la croix hammock YOLO ethical pok pok taxidermy trust fund organic dreamcatcher tacos. Franzen four loko man braid letterpress umami offal. Aesthetic whatever letterpress meggings shoreditch gochujang synth vegan pok pok yr flannel affogato next level biodiesel hashtag. Banjo vaporware lyft unicorn tumblr. Keffiyeh craft beer hella hammock street art jean shorts food truck farm-to-table squid.</p>
+
+<h2 id="개요">개요</h2>
+
+<p>앞서 민원 분석을 실시한 결과(참고: https://suhae-bae.github.io/%EC%9D%B8%EC%B2%9C-%EC%A4%91%EA%B5%AC%EC%B2%AD-%EB%AF%BC%EC%9B%90%EB%B6%84%EC%84%9D/), 상당수의 민원이 주차 관련 문제임을 파악하였다. 이에 차량 등록 대장과 같은 데이터를 활용하여 어떤 행정동의 주차 문제가 시급한지 파악하고, 여유공간을 계산하여 해결책을 제시하고자 이 프로젝트를 진행하였다.</p>
+
+<p>앞서 다른 프로젝트와 마찬가지로, 보안 규정에 따라 전체 코드와 데이터를 공개할 수는 없지만(Github에도 코드를 업로드하지 못했다) 최대한 가능한 선에서 소개하도록 하겠다. 또한 사전에 담당자님으로부터 전달받은 raw data에는 이미 개인정보 보호를 위한 익명화가 되어 있었고, 데이터 분석을 위한 필수 데이터를 제외한 정보는 삭제되어 있었음을 알린다.</p>
+
+<h2 id="사용-데이터-및-기술">사용 데이터 및 기술</h2>
+
+<p>사용 데이터 목록은 다음과 같다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th style="text-align: center">순번</th>
+      <th style="text-align: center">데이터명</th>
+      <th style="text-align: center">시점</th>
+      <th style="text-align: center">단위</th>
+      <th style="text-align: center">포멧</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td style="text-align: center">1</td>
+      <td style="text-align: center">건축물 대장</td>
+      <td style="text-align: center">2020.12</td>
+      <td style="text-align: center">건물</td>
+      <td style="text-align: center">excel</td>
+    </tr>
+    <tr>
+      <td style="text-align: center">2</td>
+      <td style="text-align: center">차량등록대장</td>
+      <td style="text-align: center">2020.12</td>
+      <td style="text-align: center">주소</td>
+      <td style="text-align: center">excel</td>
+    </tr>
+    <tr>
+      <td style="text-align: center">3</td>
+      <td style="text-align: center">불법주정차 과태료 부과대장</td>
+      <td style="text-align: center">2020.12</td>
+      <td style="text-align: center">단속지점</td>
+      <td style="text-align: center">excel</td>
+    </tr>
+    <tr>
+      <td style="text-align: center">4</td>
+      <td style="text-align: center">이동형 주차단속기록</td>
+      <td style="text-align: center">2020.12</td>
+      <td style="text-align: center">단속지점</td>
+      <td style="text-align: center">excel</td>
+    </tr>
+    <tr>
+      <td style="text-align: center">5</td>
+      <td style="text-align: center">국가기초구역(행정동)</td>
+      <td style="text-align: center">2020.12</td>
+      <td style="text-align: center">국가기초구역</td>
+      <td style="text-align: center">shp</td>
+    </tr>
+    <tr>
+      <td style="text-align: center">6</td>
+      <td style="text-align: center">주차민원데이터</td>
+      <td style="text-align: center">2020.12</td>
+      <td style="text-align: center">주소</td>
+      <td style="text-align: center">excel</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>사용 기술은 다음과 같다.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th><img src="/assets/img/QGIS.jpg" alt="QGIS" /></th>
+      <th><img src="/assets/img/Python.png" alt="Python" /></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>데이터를 지도에 시각화</td>
+      <td>데이터 전처리</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="데이터-전처리">데이터 전처리</h2>
+
+<h3 id="지오코딩">지오코딩</h3>
+
+<p>이번에 넘겨받은 데이터들은 한번 개인정보를 삭제하는 과정에서 전처리가 되었는지 결측치는 거의 없었다. 몇몇 null이 포함된 데이터를 삭제하였고(거의 없었다), 데이터를 QGIS로 시각화하기 위해 건축물 대장과 차량 등록 대장 등의 데이터의 주소를 Kakao api를 이용해 좌표로 변환하였다.</p>
+
+<pre><code class="language-Python"># 만약 찾지 못할 경우, 이전 위경도로 저장되므로 중복처리 한번 해줘야 함
+
+for i in range(len(file)):
+	# ---이부분은 생략가능(얼마나 진행됬는지 확인)---
+	if (i%500 == 0):
+		print(str(i)+" rows done")
+	# ------------------------------------------------
+	try:
+		match_first= {'x': 0, 'y': 0}
+		addr = file['주소'][i]
+		url='https://dapi.kakao.com/v2/local/search/address.json?query=' + addr
+		headers = {"Authorization": "KakaoAK 057873079626a592436710b8c7b612e8"}
+		result = json.loads(str(requests.get(url, headers=headers).text))
+		match_first = result['documents'][0]['address']
+        
+		## 데이터 추가
+		file['위도'][i] = match_first['y']
+		file['경도'][i] = match_first['x']
+        
+	except IndexError:
+		pass
+</code></pre>
+
+<h2 id="데이터-분석">데이터 분석</h2>
+
+<p>이번 분석에서는 데이터 분석 및 시각화를 위해 QGIS를 주로 사용하였다.</p>
+
+<p>그러나 이번 분석은 주차난완화 표준분석모델을 이용한 분석으로, 이는 민간에 공개되지 않은 표준분석모델이다. 따라서 표준분석모델에 없는 부분만을 업로드해두려 한다. 이 부분은 표준분석모델을 따라 진행하지 않았기에 올리는 것이다.</p>
+
+<p>총 4가지 분석을 진행했다.</p>
+
+<ul>
+  <li>공간 단위별 여유-부족 주차면 분석</li>
+  <li>불법 주정차 단속 데이터를 활용한 불법주정차 단속 밀집지도</li>
+  <li>주차민원 데이터를 활용한 불법주정차 신고 밀집지도</li>
+  <li>불법 주정차 과태료 데이터를 활용한 도로별 불법주정차 단속건수 분석</li>
+</ul>
+
+<p>이중 <strong>주차민원 데이터를 활용한 불법주정차 신고 밀집지도</strong> 분석 방법을 소개하고자 한다.</p>
+
+<p>참고로, 우리는 단속 데이터를 주차민원</p>
+
+<ol>
+  <li>먼저, QGIS를 실행시켜 주차민원 데이터와 중구 행정동 지도 데이터(.shp)를 로드한다.</li>
+</ol>
+
+<p><img src="/assets/img/parking_lot1.jpg" alt="parking_lot1" /></p>
+
+<ol>
+  <li>중구 이외의 민원은 제외하기 위해 백터 → 공간 연산 도구 → Intersection을 클릭한다.</li>
+</ol>
+
+<p><img src="/assets/img/parking_lot2.jpg" alt="parking_lot2" /></p>
+
+<ol>
+  <li>입력 레이어에 주차민원주소 데이터를, 레이어 교차분석에 행정동 데이터를 선택하고 실행한다. 이때, 두 레이어의 좌표계가 동일해야 한다.</li>
+</ol>
+
+<p><img src="/assets/img/parking_lot3.jpg" alt="parking_lot3" /></p>
+
+<ol>
+  <li>Intersection이라는 새로운 레이어가 생성되는데, 이게 중구 내의 주차민원만 선택된 데이터이다.</li>
+</ol>
+
+<p><img src="/assets/img/parking_lot4.jpg" alt="parking_lot4" /></p>
+
+<ol>
+  <li>래스터에서 온도지도를 선택하고 옵션을 선택해주면 완료된다.(없을 시 플러그인에서 활성화시켜야 한다.)</li>
+</ol>
+
+<h2 id="분석-결과">분석 결과</h2>
+
+<h3 id="공간-단위별-여유-부족-주차면-분석">공간 단위별 여유-부족 주차면 분석</h3>
+
+<table>
+  <tbody>
+    <tr>
+      <td><img src="/assets/img/space_parking1.png" alt="space_parking1" /></td>
+      <td><img src="/assets/img/space_parking2.png" alt="space_parking2" /></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>내륙지를 나누어서 분석한 결과, 연안동(가장 빨간색)의 주차면 여유가 가장 부족한 것으로 나타났다. 주차문제 핵심지역(하늘색 점선)으로는 송월동, 동인천동, 율목동 부근으로 나타났다.</p>
+
+<p>주차문제 핵심지역은 주차면과 등록차량 수를 모두 고려하여 선정하였으며, 선정 공식은 다음과 같다.</p>
+
+<blockquote>
+  <p>“SUM 총주차” / “count” &lt; 0.7 and “SUM 총주차” - “count” &lt; -250</p>
+
+  <p>(전체 주차면 / 등록차량 수 &lt; 0.7 &amp;&amp; 전체 주차면 - 등록 차량수 &lt; -250)</p>
+</blockquote>
+
+<h3 id="불법주정차-단속신고-밀집지도">불법주정차 단속/신고 밀집지도</h3>
+
+<table>
+  <tbody>
+    <tr>
+      <td><img src="/assets/img/minwon_parking1.png" alt="minwon_parking1" /></td>
+      <td><img src="/assets/img/minwon_parking2.png" alt="minwon_parking2" /></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>왼쪽 그림은 각 지자체에서 불법 주정차 단속활동을 통해 수집한 기록 중 위치정보를 이용하여 공간적 밀집도로 시각화한 결과이다. 불법 주정차 단속 데이터에 의하면 주로 중구청 주변과 연안동, 신흥동, 신포동, 동인천동 등에서 주로 단속이 이루어졌다. 오른쪽 그림은 주차민원 발생 지역을 공간적 밀집도로 시각화한 결과로, 가장 민원 발생 밀집도가 높은 지역은 인천공항과 운서역, 영종신도시, 그리고 중구청 부근, 동인천동일대인 것으로 나타났다.</p>
+
+<h3 id="불법-주정차-과태료-데이터를-활용한-도로별-불법주정차-단속건수-분석">불법 주정차 과태료 데이터를 활용한 도로별 불법주정차 단속건수 분석</h3>
+
+<table>
+  <tbody>
+    <tr>
+      <td><img src="/assets/img/parking_road1.png" alt="parking_road1" /></td>
+      <td><img src="/assets/img/parking_road2.png" alt="parking_road2" /></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>단속 건수를 도로별로 분석하여 시각화 한 결과이다. 가장 단속이 많이 된 도로는 축항대로117번길, 축항대로165번길, 신포로27번길, 신포로46번길로 나타났다.</p>
+
+<h2 id="주차난-완화-방안-제시">주차난 완화 방안 제시</h2>
+
+<p><img src="/assets/img/parking_result1.jpg" alt="parking_result1" /></p>
+
+<p>공교롭게도 가장 많은 단속 횟수를 나타내는 도로는 중구청 앞인 신포로27번길이었다. 주차공간의 부재와 도로가 협소한 탓에, 실제로 이 도로를 통행하는 시민들이 많은 불편을 느낀다는 민원이 있었다. 이를 일부 해소하기 위해, 근처의 숙박업소와 주차장 협업을 하는것을 제안하는 바이다.</p>
+
+<p><img src="/assets/img/parking_result2.jpg" alt="parking_result2" /></p>
+
+<p>다음과 같이 문제 지역으로 나타난 구간의 도로 주변을 고려하여, 숙박업소의 위치를 시각화 하였다. 해당하는 지역의 주차난 완화를 해결하기 위해 근처 공간을 활용하면 주차난 해소에 도움이 될 것으로 예상한다.</p>
+:ET
