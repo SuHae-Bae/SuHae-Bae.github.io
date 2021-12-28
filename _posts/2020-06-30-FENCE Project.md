@@ -1,7 +1,7 @@
 ---
 layout: post
 title: FENCE Project
-date: 2020-11-30 00:00:00 +0300
+date: 2020-06-30 00:00:00 +0300
 description: FENCE Project 소개 # Add post description (optional)
 img: fence.png # Add image post (optional)
 tags: [FENCE, 캡스톤 프로젝트] # add tag 
@@ -139,11 +139,12 @@ tags: [FENCE, 캡스톤 프로젝트] # add tag
    
    * 생활안전지도에서 제공하는 치안안전등급 정보는 다음과 같다.
    
+
 <img src="https://user-images.githubusercontent.com/33304898/82802455-e537d000-9eb9-11ea-8c7e-faa855157aee.png" width = 600, height = 300>
        
        
       - 생활안전지도에서 api형태가 아닌 png로 데이터를 제공해주기 때문에 직접 수집해야하는 어려움이 있었다.
-       
+
 
 2. 지구대 및 파출소 별 관할 구역 데이터 정리
 
@@ -168,7 +169,7 @@ tags: [FENCE, 캡스톤 프로젝트] # add tag
     - 구로구
     
  2. 서울시 각 자치구의 범죄율 순위를 바탕으로 하위 6개의 구 조사
- 
+
     - [데이터보기](https://github.com/MJU-Capstone-Design/FENCE_data_analysis/blob/master/yurim/02secure_data/low_secure.csv)
     - 강서구
     - 양천구
@@ -241,14 +242,14 @@ tags: [FENCE, 캡스톤 프로젝트] # add tag
 * 전체적으로 거의 상관관계가 없어보임 
 
 * 모든 범죄가 미약하지만 양의 상관관계를 갖는다.
- 
- 
+
+
  **2. 범죄율 하위 6개구**
- 
+
  ![image](https://user-images.githubusercontent.com/33304898/82825291-f0085a00-9ee5-11ea-9c8f-7b6632c71c8d.png)
- 
+
  * 전체적으로 양의 상관관계가 있는 것으로 보임
- 
+
  * 특히 폭력과 성폭력의 경우 다른 범죄에 비해 확실한 양의 상관관계를 갖는다.
 
 [데이터 전처리 및 분석 코드 바로가기](https://github.com/MJU-Capstone-Design/FENCE_data_analysis/tree/master/leean/01cctv_analysis)
@@ -313,7 +314,7 @@ tags: [FENCE, 캡스톤 프로젝트] # add tag
 * 거의 상관관계가 없는 것으로 보이는 결과가 나왔다.
 
 * 하지만 상관관계의 부호가 – (마이너스)가 대부분으로 거의 상관관계는 없으나 미약한 음의 관계가 있다고 볼 수 있다.
- 
+
 * 다른 범죄에 비해서 절도의 경우에는 다른 범죄에 비해서 보안등과 더 음의 상관관계가 있다고 보여진다.
 
 [데이터 전처리 및 분석 코드 바로가기](https://github.com/MJU-Capstone-Design/FENCE_data_analysis/tree/master/leean/02light_analysis)
@@ -366,24 +367,24 @@ tags: [FENCE, 캡스톤 프로젝트] # add tag
 **1. 범죄율 상위 8개 구**
 
 <img src="https://user-images.githubusercontent.com/33304898/82825779-cbf94880-9ee6-11ea-8239-cca624fe3e2f.png" width = 700 height = 350>
- 
+
  * 전체적으로 약한 음의 상관관계를 가지고 있다.
- 
+
  * 특히 폭력에서 음의 상관관계가 나타난다.
- 
- 
+
+
 ![image](https://user-images.githubusercontent.com/33304898/82825967-301c0c80-9ee7-11ea-9e52-eb352f8962aa.png)
 
 
  * 상관관계를 히트맵으로 시각화
- 
- 
+
+
  **2. 범죄율 하위 6개구**
- 
+
 <img src="https://user-images.githubusercontent.com/33304898/82826211-a882cd80-9ee7-11ea-8106-9855058cd53e.png" width=700 height=350>
- 
+
  * 전체적으로 양의 상관관계를 가지고 있다/
- 
+
 ![image](https://user-images.githubusercontent.com/33304898/82826305-d700a880-9ee7-11ea-8be3-04783d4920b3.png)
 
  * 상관관계를 히트맵으로 시각화
@@ -465,6 +466,7 @@ tags: [FENCE, 캡스톤 프로젝트] # add tag
    - 공원
    등등....
    
+
 🌀 근린시설의 종류들 중에서 `일반음식점` `휴게음식점` `문화시설` `공원`의 데이터를 수집해 분석에 활용하기로 결정
 
 
@@ -533,6 +535,7 @@ tags: [FENCE, 캡스톤 프로젝트] # add tag
 
    - [관련코드](https://github.com/MJU-Capstone-Design/FENCE_data_analysis/blob/master/yurim/03corr_neigh/data_preprocessing/code/union_df.py)
    
+
 **2. 문화시설**
 
 * 주소데이터가 비어있는 경우가 있어, 구글맵에서 찾아 주소 및 위도/경도 데이터 추가
@@ -579,12 +582,12 @@ def correlation(green_num, rate):
 <img src = "https://user-images.githubusercontent.com/33304898/82792326-30e27d80-9eaa-11ea-84f6-d29c4bfeb5a9.png" width="600" height="300">
 
  * 절도, 폭력에서 약한 음의 상관관계를 보임
- 
+
  * 하지만... 너무 약해서 문제
- 
- 
+
+
  **2. 범죄율 하위 6개구**
- 
+
  <img src = "https://user-images.githubusercontent.com/33304898/82792843-fa593280-9eaa-11ea-8647-355705615174.png" width="600" height="300">
 
 * 전반적으로 양의 상관관계를 갖는다
