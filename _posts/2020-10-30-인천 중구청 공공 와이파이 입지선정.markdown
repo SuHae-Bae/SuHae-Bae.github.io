@@ -128,6 +128,323 @@ EDA와 위에서 와이파이 개수를 시각화한 결과를 바탕으로, 영
 
 
 
+와이파이 지수를 분석하는데 사용한 SQL문은 다음과 같다.
+
+```sql
+-- 테이블 생성
+create table DATA_SET_T
+(
+	-- 01-01. 기본 변수
+	spo_cd character varying(50),     -- cell 코드
+	grs_x character varying(50), 	-- GRS80 UTM-K 좌표 x
+	grs_y character varying(50), 	-- GRS80 UTM-K 좌표 y
+	geom geometry(MultiPolygon, 5179),
+	-- 01-02. 와이파이 변수
+	w_pnt numeric,     -- 와이파이 Cell 위치 여부(1 혹은 0) 
+	w_pnt_150m numeric,	-- 와이파이 반경 150m 위치 여부
+	-- 01-03. 인구 변수
+	liv_pp numeric,     -- 생산가능 인구
+	-- 01-04. 거리 변수
+	-- + 요소
+	cal_dist numeric,     -- Cell별 500m 문화재 이내 거리
+	tou_dist numeric,     -- Cell별 500m 이내 관광지의 거리
+	pub_dist numeric,     -- Cell별 집합건물 500m 이내 거리
+	hot_dist numeric,     -- Cell별 500m 숙박업소 이내 거리
+	mul_dist numeric,     -- Cell별 500m 다중이용시설 이내 거리
+	bus_dist numeric,     -- Cell별 500m 버스정류장 이내 거리
+	food_dist numeric,     -- Cell별 500m 음식점 이내 거리
+	caf_dist numeric,     -- Cell별 500m 집단급식소 이내 거리
+	-- - 요소
+	sch_dist numeric,     -- Cell별 500m 학교 이내 거리
+	-- 01-05. 지수 변수
+	liv_w numeric,     -- 거주인구(생산가능인구) 지수
+	cal_w numeric,     -- 문화재 지역 지수
+	tou_w numeric,     -- 관광지 지역 지수
+	pub_w numeric,     -- 집합건물 지수
+	hot_w numeric,     -- 숙박업소 지수
+	mul_w numeric,     -- 다중이용시설 지수
+	bus_w numeric,     -- 버스정류장 지수
+	food_w numeric,	   -- 음식점 지수
+	caf_w numeric,	   -- 집단급식소 지수
+	sch_w numeric,     -- 학교 지수
+	pnt_w numeric,	   -- 와이파이 지수
+	pnt_150m_w numeric,	   --와이파이 반경 150m 지수
+	tt_w numeric     -- 총 지수값
+);
+```
+
+```sql
+-- 인덱스 생성
+CREATE INDEX DATA_SET_geom_idx ON public.DATA_SET_T USING gist (geom);
+
+
+
+
+
+with kb_GRID_01_1 as
+(
+	select
+		gid as spo_cd,
+		ST_X(ST_CENTROID(geom)) as grs_x,
+		ST_Y(ST_CENTROID(geom)) as grs_y,
+		geom
+	from v_liv_pop
+)
+insert into DATA_SET_T select * from kb_GRID_01_1;
+```
+
+```sql
+-- 와이파이 설치지역
+-- 해당 격자에 와이파이가 설치되어 있으면 1, 없으면 0 부여
+with kb_GRID_02_1 as
+(
+	select b.spo_cd
+	from B_WIFI_POINT a, DATA_SET_T b
+	where ST_INTERSECTS(a.geom, b.geom)
+)
+update DATA_SET_T as grid set w_pnt = 1 from kb_GRID_02_1 as kb where grid.spo_cd = kb.spo_cd;
+update DATA_SET_T as grid set w_pnt = 0 where w_pnt is null;
+```
+
+```sql
+-- 반경 150m내 와이파이 설치지역
+-- 와이파이 설치지점으로부터 150m 이내면 1, 150m 밖이면 0 부여 
+with kb_GRID_02_2 as
+(
+	select b.spo_cd
+	from B_WIFI_POINT a, DATA_SET_T b
+	where ST_INTERSECTS(st_buffer(a.geom,150), b.geom)
+)
+update DATA_SET_T as grid set w_pnt_150m = 1 from kb_GRID_02_2 as kb where grid.spo_cd = kb.spo_cd;
+update DATA_SET_T as grid set w_pnt_150m = 0 where w_pnt_150m is null;
+```
+
+```sql
+-- 생산가능인구
+with kb_GRID_03_2 as
+(
+	select b.spo_cd, COALESCE(round(a.val,2),0) as val
+	from v_liv_pop a, DATA_SET_T b
+	where ST_INTERSECTS(ST_CENTROID(a.geom), b.geom)
+)
+update DATA_SET_T as grid
+	set liv_pp = pop.val
+from kb_GRID_03_2 as pop
+where grid.spo_cd = pop.spo_cd;
+update DATA_SET_T set liv_pp = 0.00 where liv_pp is null;
+
+```
+
+```sql
+-- 문화재와 500m 이내의 거리 계산
+-- 문화재에 포함되는 격자 데이터를 5km 격자만 추출하여 거리계산 값을 생성하고, 그 이외 격자는 -1 데이터로 업데이트 한다.
+-- 이후 다른 거리 계산도 같은 방식으로 업데이트 함
+with kb_GRID_04_1 as
+(
+	select a.spo_cd, COALESCE(min(round(cast(ST_Distance(a.geom, b.geom) as numeric),2)),-1) as meter
+	from (select spo_cd, geom from DATA_SET_T) a
+		LEFT JOIN
+		(select geom from v_heritage) b
+		ON ST_DWithin(a.geom, b.geom, 500)
+	group by a.spo_cd
+)
+update DATA_SET_T as grid set cal_dist = kb.meter from kb_GRID_04_1 as kb where grid.spo_cd = kb.spo_cd;
+
+```
+
+```sql
+-- 관광지와 500m 이내의 거리 계산
+with kb_GRID_04_2 as
+(
+	select a.spo_cd, COALESCE(min(round(cast(ST_Distance(a.geom, b.geom) as numeric),2)),-1) as meter
+	from (select spo_cd, geom from DATA_SET_T) a
+		LEFT JOIN
+		(select geom from v_tour_zone) b
+		ON ST_DWithin(a.geom, b.geom, 500)
+	group by a.spo_cd
+)
+update DATA_SET_T as grid set tou_dist = kb.meter from kb_GRID_04_2 as kb where grid.spo_cd = kb.spo_cd;
+```
+
+```sql
+-- 집합건물과 500m 이내의 거리 계산
+with kb_GRID_04_3 as
+(
+	select a.spo_cd, COALESCE(min(round(cast(ST_Distance(a.geom, b.geom) as numeric),2)),-1) as meter
+	from (select spo_cd, geom from DATA_SET_T) a
+		LEFT JOIN
+		(select geom from v_pub_buld) b
+		ON ST_DWithin(a.geom, b.geom, 500)
+	group by a.spo_cd
+)
+update DATA_SET_T as grid set pub_dist = kb.meter from kb_GRID_04_3 as kb where grid.spo_cd = kb.spo_cd;
+```
+
+```sql
+-- 숙박업소와 500m 이내의 거리 계산
+with kb_GRID_04_4 as
+(
+	select a.spo_cd, COALESCE(min(round(cast(ST_Distance(a.geom, b.geom) as numeric),2)),-1) as meter
+	from (select spo_cd, geom from DATA_SET_T) a
+		LEFT JOIN
+		(select geom from v_hotel) b
+		ON ST_DWithin(a.geom, b.geom, 500)
+	group by a.spo_cd
+)
+update DATA_SET_T as grid set hot_dist = kb.meter from kb_GRID_04_4 as kb where grid.spo_cd = kb.spo_cd;
+```
+
+```sql
+-- 다중이용시설과 500m 이내의 거리 계산
+with kb_GRID_04_5 as
+(
+	select a.spo_cd, COALESCE(min(round(cast(ST_Distance(a.geom, b.geom) as numeric),2)),-1) as meter
+	from (select spo_cd, geom from DATA_SET_T) a
+		LEFT JOIN
+		(select geom from v_multiuse) b
+		ON ST_DWithin(a.geom, b.geom, 500)
+	group by a.spo_cd
+)
+update DATA_SET_T as grid set mul_dist = kb.meter from kb_GRID_04_5 as kb where grid.spo_cd = kb.spo_cd;
+```
+
+```sql
+-- 버스정류장과 500m 이내의 거리 계산
+with kb_GRID_04_6 as
+(
+	select a.spo_cd, COALESCE(min(round(cast(ST_Distance(a.geom, b.geom) as numeric),2)),-1) as meter
+	from (select spo_cd, geom from DATA_SET_T) a
+		LEFT JOIN
+		(select geom from v_bus) b
+		ON ST_DWithin(a.geom, b.geom, 500)
+	group by a.spo_cd
+)
+update DATA_SET_T as grid set bus_dist = kb.meter from kb_GRID_04_6 as kb where grid.spo_cd = kb.spo_cd;
+```
+
+```sql
+-- 음식점과 500m 이내의 거리 계산
+with kb_GRID_04_7 as
+(
+	select a.spo_cd, COALESCE(min(round(cast(ST_Distance(a.geom, b.geom) as numeric),2)),-1) as meter
+	from (select spo_cd, geom from DATA_SET_T) a
+		LEFT JOIN
+		(select geom from v_food) b
+		ON ST_DWithin(a.geom, b.geom, 500)
+	group by a.spo_cd
+)
+update DATA_SET_T as grid set food_dist = kb.meter from kb_GRID_04_7 as kb where grid.spo_cd = kb.spo_cd;
+```
+
+```sql
+-- 집단습식소와 500m 이내의 거리 계산
+with kb_GRID_04_8 as
+(
+	select a.spo_cd, COALESCE(min(round(cast(ST_Distance(a.geom, b.geom) as numeric),2)),-1) as meter
+	from (select spo_cd, geom from DATA_SET_T) a
+		LEFT JOIN
+		(select geom from v_cafeteria) b
+		ON ST_DWithin(a.geom, b.geom, 500)
+	group by a.spo_cd
+)
+update DATA_SET_T as grid set caf_dist = kb.meter from kb_GRID_04_8 as kb where grid.spo_cd = kb.spo_cd;
+```
+
+```sql
+-- 학교에 포함되는 격자 데이터를 500m 격자만 추출하여 거리계산 값을 생성하고, 그 의외의 격자는 -1 데이터로 업데이트 한다
+with kb_GRID_04_9 as
+(
+	select a.spo_cd, COALESCE(min(round(cast(ST_Distance(a.geom, b.geom) as numeric),2)),-1) as meter
+	from (select spo_cd, geom from DATA_SET_T) a
+		LEFT JOIN
+		(select geom from v_school) b
+		ON ST_DWithin(a.geom, b.geom, 500)
+	group by a.spo_cd
+)
+update DATA_SET_T as grid set sch_dist = kb.meter from kb_GRID_04_9 as kb where grid.spo_cd = kb.spo_cd;
+```
+
+```sql
+-- 점수 계산
+with kb_GRID_05_1 as
+(
+	select spo_cd,
+	-- 생산가능인구
+	CASE	when liv_pp > 0 and liv_pp <= 50 then '2'
+	     	when liv_pp > 50 and liv_pp <= 148 then '3'
+	     	when liv_pp > 148 and liv_pp <= 276 then '4'
+	     	when liv_pp > 457 then '5'	else '1'
+	END AS weight_liv_pp,
+	-- 와이파이 지수(설치지역, 150m반경)
+    -- 설치 안된 곳(0)은 5점 부여, 아닐 시 1점 부여
+	CASE when w_pnt = '0' then '5' else '1'
+	END AS weight_w_pnt,
+	CASE when w_pnt_150m = '0' then '5'	else '1'
+	END AS weight_w_pnt_150m,
+	-- 학교가 위치한 격자의 경우 계산에서 제외하기 위해 음수값 입력
+	CASE when sch_dist = 0 then '0'
+		when sch_dist > 0 then round(((sch_dist)/125+1), 4)		else '5'
+	END AS weight_sch_dist,
+	-- 관광지 지역과의 거리에 반비례한 지수값 입력
+	CASE when tou_dist >= 0 then round(((500-tou_dist)/125+1), 4)		else '1'
+	END AS weight_tou_dist,
+	-- 문화재 지역과의 거리에 반비례한 지수값 입력
+	CASE when cal_dist >= 0 then round(((500-cal_dist)/125+1), 4)		else '1'
+	END AS weight_cal_dist,
+	-- 집합건물과의 거리에 반비례한 지수값 입력
+	CASE when pub_dist >= 0 then round(((500-pub_dist)/125+1), 4)		else '1'
+	END AS weight_pub_dist,
+	-- 숙박업소와의 거리에 반비례한 지수값 입력
+	CASE when hot_dist >= 0 then round(((500-hot_dist)/125+1), 4)		else '1'
+	END AS weight_hot_dist,
+	-- 다중이용시설과의 거리에 반비례한 지수값 입력
+	CASE when mul_dist >= 0 then round(((500-mul_dist)/125+1), 4)		else '1'
+	END AS weight_mul_dist,
+	-- 버스정류장과의 거리에 반비례한 지수값 입력
+	CASE when bus_dist >= 0 then round(((500-bus_dist)/125+1), 4)		else '1'
+	END AS weight_bus_dist,
+-- 음식점과의 거리에 반비례한 지수값 입력
+	CASE when food_dist >= 0 then round(((500-food_dist)/125+1), 4)		else '1'
+	END AS weight_food_dist,
+-- 집단급식소와의 거리에 반비례한 지수값 입력
+	CASE when caf_dist >= 0 then round(((500-caf_dist)/125+1), 4)		else '1'
+	END AS weight_caf_dist
+	from DATA_SET_T
+)
+update DATA_SET_T as grid
+	set
+	cal_w = weight_cal_dist::numeric,
+	tou_w = weight_tou_dist::numeric,
+	pub_w = weight_pub_dist::numeric,
+	hot_w = weight_hot_dist::numeric,
+	mul_w = weight_mul_dist::numeric,
+	bus_w = weight_bus_dist::numeric,
+	food_w = weight_food_dist::numeric,
+	caf_w = weight_caf_dist::numeric,
+	sch_w = weight_sch_dist::numeric,
+	pnt_w = weight_w_pnt::numeric,
+	pnt_150m_w = weight_w_pnt_150m::numeric,
+	liv_w = weight_liv_pp::numeric
+from kb_GRID_05_1 as kb
+where grid.spo_cd = kb.spo_cd;
+```
+
+```sql
+-- 와이파이 설치 지수 취합
+update DATA_SET_T
+set tt_w = 
+	case
+		when sch_w <= 0 then '0'
+		when sch_w > 0 then round((cal_w + tou_w + pub_w + hot_w + mul_w + bus_w + food_w + caf_w + sch_w + pnt_w + pnt_150m_w +liv_w), 4)
+	end;
+```
+
+
+
+
+
+
+
 
 
 ## 분석 결과
